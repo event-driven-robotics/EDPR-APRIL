@@ -5,16 +5,16 @@ EDPR repository for the European project [APRIL](http://aprilproject.eu/).
 The software was tested on Ubuntu 20.04.2 LTS.
 
 - Install the latest [Nvidia driver](https://github.com/NVIDIA/nvidia-docker/wiki/Frequently-Asked-Questions#how-do-i-install-the-nvidia-driver)
-- Install [docker-engine](https://docs.docker.com/engine/install/ubuntu)
+- Install [Docker Engine](https://docs.docker.com/engine/install/ubuntu)
 - Install [Nvidia Docker Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker)
 - Build the Docker image
 ```shell
-docker build -t <container_name> - < Dockerfile
+$ docker build -t <container_name> - < Dockerfile
 ```
 
 ## Usage
 - Run the Docker container
 ```shell
-xhost +
-docker run -it --net=host -e DISPLAY --runtime=nvidia <image_id>
+$ xhost +
+$ docker run -it --net=host -e DISPLAY --runtime=nvidia <image_id>
 ```
