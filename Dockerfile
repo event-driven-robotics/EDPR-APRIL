@@ -7,6 +7,8 @@ FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 # OPENPOSE #
 ############
 
+# ARG OPENPOSE_VERSION=1.7.0
+
 # install dependencies
 RUN apt-get update && \
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -34,7 +36,8 @@ ENV PATH="/opt/cmake-3.16.0-Linux-x86_64/bin:${PATH}"
 
 # git clone openpose
 WORKDIR /openpose
-RUN git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose.git .
+RUN git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose.git . 
+    # && git checkout v$OPENPOSE_VERSION
 
 # build openpose
 WORKDIR /openpose/build
@@ -45,7 +48,7 @@ RUN cmake \
           -DDOWNLOAD_BODY_MPI_MODEL=OFF \
           -DDOWNLOAD_HAND_MODEL=OFF \
           -DDOWNLOAD_FACE_MODEL=OFF \
-          .. #&& make -j `nproc`
+          ..
 
 # remove compilation for the Ampere architecture (cuda 10 is not compatible with it, it needs cuda 11)
 # see https://github.com/CMU-Perceptual-Computing-Lab/openpose/issues/1753#issuecomment-792431838
@@ -70,11 +73,11 @@ RUN apt-get install unzip && \
     rm models.zip
 
 
-RUN echo "*************** building yarp ****************"
-
 ############
 #   YARP   #
 ############
+
+RUN echo "*************** building yarp ****************"
 
 ARG YARP_VERSION=3.4.4
 # ARG YCM_VERSION=0.11.1
@@ -169,3 +172,7 @@ EXPOSE 10000/tcp 10000/udp
 # Some QT-Apps don't show controls without this
 ENV QT_X11_NO_MITSHM 1
 
+
+# add /usr/local/lib to the library path, so that libcaffe.so compiled with openpose will be used
+# instead of the one provided by the nvidia/cuda docker image
+RUN export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
