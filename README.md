@@ -14,7 +14,7 @@ The software was tested on Ubuntu 20.04.2 LTS.
 - Place video frames recorded with [Yarp Data Dumper](https://www.yarp.it/git-master/yarpdatadumper.html) in a folder called `/data`
 
 ## Usage
-- Open a terminal, run the Docker container and compile and run the pose detector
+- Open a terminal, run the Docker container and compile the pose detector
     ```shell
     $ xhost +
     $ docker run -it -v /abs/path/to/code/dir:/code -v /abs/path/to/data/dir:/data -v /tmp/.X11-unix/:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY --runtime=nvidia <image_id>
