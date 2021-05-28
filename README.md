@@ -11,29 +11,39 @@ The software was tested on Ubuntu 20.04.2 LTS.
     ```shell
     $ docker build -t <container_name> - < Dockerfile
     ```
+- Place video frames recorded with [Yarp Data Dumper](https://www.yarp.it/git-master/yarpdatadumper.html) in a folder called `/data`
 
 ## Usage
-- Open a terminal, run the Docker container and the yarp server
+- Open a terminal, run the Docker container and compile and run the pose detector
     ```shell
     $ xhost +
-    $ docker run -it -v /abs/path/to/code/dir:/code -v /tmp/.X11-unix/:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY --runtime=nvidia <image_id>
+    $ docker run -it -v /abs/path/to/code/dir:/code -v /abs/path/to/data/dir:/data -v /tmp/.X11-unix/:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY --runtime=nvidia <image_id>
     # inside the container
     $ cd /code
     $ mkdir build && cd build
     $ cmake .. && make
-    $ ./test.bin --yarp-image-producer /frameGrabber --model-folder /openpose/models
     ```
 
-- Open a new terminal and run the frames producer in the running container
+- Open a new terminal and run the yarp server in the running container
     ```shell
     $ docker exec -it <container_id/container_name> bash  # executes a bash terminal in the running container
     # inside the container
     $ yarpserver
     ```
 
-- Open a new terminal, compile and run the pose detector in the running container
+- Open a new terminal and run the [Yarp Data Player](https://www.yarp.it/git-master/yarpdataplayer.html) in the running container
     ```shell
     $ docker exec -it <container_id/container_name> bash  # executes a bash terminal in the running container
     # inside the container
-    $ yarpdev --device fakeFrameGrabber --period 0.5 --width 640 --height 480 --name /frameGrabber
+    $ yarpdataplayer  # launch data player's gui
+    ```
+
+- In the Data Player GUI
+    - Select File -> Open Directory, open folder `/data` and click on the `Open` button
+    - Select Option -> Repeat
+    - Click on the play button
+
+- Run the pose detector in the terminal where it was compiled
+    ```shell
+    $ ./code/build/test.bin --yarp-image-producer <data_player_port_name> --model-folder /openpose/models
     ```
