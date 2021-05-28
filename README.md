@@ -11,7 +11,7 @@ The software was tested on Ubuntu 20.04.2 LTS.
     ```shell
     $ docker build -t <container_name> - < Dockerfile
     ```
-- Place video frames recorded with [Yarp Data Dumper](https://www.yarp.it/git-master/yarpdatadumper.html) in a folder called `/data`
+- Place video frames recorded with [Yarp Data Dumper](https://www.yarp.it/git-master/yarpdatadumper.html) in a folder called `/data` (e.g. `//IITICUBNS010.iit.local/human_pose_estimation/Datasets/HVGA_pilots/01042021/exp2`, download only the `grayscale` folder containing the image frames)
 
 ## Usage
 - Open a terminal, run the Docker container and compile the pose detector
