@@ -41,6 +41,6 @@ find_package(YARP COMPONENTS cv os sig REQUIRED)
  
 include_directories(${OpenPose_INCLUDE_DIRS} ${GFLAGS_INCLUDE_DIR} ${GLOG_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
 
-add_executable(test.bin test.cpp)
+add_executable(pose_detector.bin pose_detector.cpp)
  
-target_link_libraries(test.bin ${OpenPose_LIBS} ${GFLAGS_LIBRARY} ${GLOG_LIBRARY} ${OpenCV_LIBS} YARP::YARP_cv YARP::YARP_os YARP::YARP_sig YARP::YARP_init)
+target_link_libraries(pose_detector.bin ${OpenPose_LIBS} ${GFLAGS_LIBRARY} ${GLOG_LIBRARY} ${OpenCV_LIBS} YARP::YARP_cv YARP::YARP_os YARP::YARP_sig YARP::YARP_init)
