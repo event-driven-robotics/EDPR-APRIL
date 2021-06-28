@@ -45,5 +45,5 @@ The software was tested on Ubuntu 20.04.2 LTS.
 
 - Run the pose detector in the terminal where it was compiled
     ```shell
-    $ ./code/build/test.bin --yarp-image-producer <data_player_port_name> --model-folder /openpose/models
+    $ ./code/build/pose_detector --yarp-image-producer <data_player_port_name> --model-folder /openpose/models
     ```

@@ -7,7 +7,7 @@
 #get_filename_component(SOURCE_NAME test.cpp NAME_WE)
 #
 #if (UNIX OR APPLE)
-#  set(EXE_NAME "${SOURCE_NAME}.bin")
+#  set(EXE_NAME "${SOURCE_NAME}")
 #elseif (WIN32)
 #  set(EXE_NAME "test")
 #endif ()
@@ -41,6 +41,6 @@ find_package(YARP COMPONENTS cv os sig REQUIRED)
  
 include_directories(${OpenPose_INCLUDE_DIRS} ${GFLAGS_INCLUDE_DIR} ${GLOG_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
 
-add_executable(pose_detector.bin pose_detector.cpp)
+add_executable(pose_detector pose_detector.cpp)
  
-target_link_libraries(pose_detector.bin ${OpenPose_LIBS} ${GFLAGS_LIBRARY} ${GLOG_LIBRARY} ${OpenCV_LIBS} YARP::YARP_cv YARP::YARP_os YARP::YARP_sig YARP::YARP_init)
+target_link_libraries(pose_detector ${OpenPose_LIBS} ${GFLAGS_LIBRARY} ${GLOG_LIBRARY} ${OpenCV_LIBS} YARP::YARP_cv YARP::YARP_os YARP::YARP_sig YARP::YARP_init)
