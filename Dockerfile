@@ -58,20 +58,6 @@ RUN sed -ie 's/set(AMPERE "80 86")/#&/g'  ../cmake/Cuda.cmake && \
 RUN make -j`nproc`
 RUN make install
 
-# download models from google drive (https://drive.google.com/file/d/1QCSxJZpnWvM00hx49CJ2zky7PWGzpcEh/view)
-# see https://github.com/CMU-Perceptual-Computing-Lab/openpose/issues/1602#issuecomment-641653411
-WORKDIR /openpose/tmp
-RUN git clone https://github.com/chentinghao/download_google_drive.git && \
-    pip3 install requests tqdm && \
-    cd download_google_drive && \
-    python3 download_gdrive.py 1QCSxJZpnWvM00hx49CJ2zky7PWGzpcEh ../../models.zip
-    
-# extract downloaded models
-WORKDIR /openpose
-RUN apt-get install unzip && \
-    unzip models.zip && \
-    rm models.zip
-
 
 ############
 #   YARP   #
@@ -176,3 +162,22 @@ ENV QT_X11_NO_MITSHM 1
 # add /usr/local/lib to the library path, so that libcaffe.so compiled with openpose will be used
 # instead of the one provided by the nvidia/cuda docker image
 ENV LD_LIBRARY_PATH /usr/local/lib:$LD_LIBRARY_PATH
+
+
+############
+# OPENPOSE #
+############
+
+# download models from google drive (https://drive.google.com/file/d/1QCSxJZpnWvM00hx49CJ2zky7PWGzpcEh/view)
+# see https://github.com/CMU-Perceptual-Computing-Lab/openpose/issues/1602#issuecomment-641653411
+WORKDIR /openpose/tmp
+RUN git clone https://github.com/chentinghao/download_google_drive.git && \
+    pip3 install requests tqdm && \
+    cd download_google_drive && \
+    python3 download_gdrive.py 1QCSxJZpnWvM00hx49CJ2zky7PWGzpcEh ../../models.zip
+
+# extract downloaded models
+WORKDIR /openpose
+RUN apt-get install unzip && \
+    unzip models.zip && \
+    rm models.zip
