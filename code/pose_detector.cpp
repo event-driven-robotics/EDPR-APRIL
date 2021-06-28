@@ -26,6 +26,35 @@ DEFINE_bool(no_display, false, "Enable to disable the visual display.");
 
 
 // This worker will just read and return all the jpg files in a directory
+
+cv::Mat convertToCV(const std::shared_ptr<std::vector<std::shared_ptr<op::Datum>>>& datumsPtr)
+{
+    try
+    {
+        // User's displaying/saving/other processing here
+        // datum.cvOutputData: rendered frame with pose or heatmaps
+        // datum.poseKeypoints: Array<float> with the estimated pose
+        if (datumsPtr != nullptr && !datumsPtr->empty())
+        {
+            // Display image
+            const cv::Mat cvMat = OP_OP2CVCONSTMAT(datumsPtr->at(0)->cvOutputData);
+            if (!cvMat.empty())
+            {
+                return cvMat;
+            }
+            else
+                op::opLog("Empty cv::Mat as output.", op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
+        }
+        else
+            op::opLog("Nullptr or empty datumsPtr found.", op::Priority::High);
+    }
+    catch (const std::exception& e)
+    {
+        op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
+    }
+
+}
+
 void display(const std::shared_ptr<std::vector<std::shared_ptr<op::Datum>>>& datumsPtr)
 {
     try
@@ -162,6 +191,7 @@ void runPoseDetector(op::Wrapper &detector, cv::Mat &image)
             // printKeypoints(datumProcessed);
             if (!FLAGS_no_display)
                 display(datumProcessed);
+            image = convertToCV(datumProcessed);
         }
         else
             std::cout << "Image could not be processed" << std::endl;
@@ -188,10 +218,16 @@ int main(int argc, char *argv[])
     // Set up YARP ports and connections
     Network yarp;
     BufferedPort<ImageOf<PixelRgb>> inPort;
-    bool ok = inPort.open("/pose_detector/in");
+    BufferedPort< ImageOf<PixelRgb> > outPort;
+    bool ok = inPort.open("/pose_detector/img:i");
     if (!ok) {
-        std::cout << "Failed to create port" << std::endl;
+        std::cout << "Failed to create input port" << std::endl;
         std::cout << "Maybe you need to start a nameserver (run 'yarpserver')" << std::endl;
+        return 1;
+    }
+
+    if(!outPort.open("/pose_detector/img:o")) {
+        yError() << "Failed to create output port";
         return 1;
     }
     
@@ -226,6 +262,9 @@ int main(int argc, char *argv[])
         runPoseDetector(poseDetector, imgCV);
 
         std::cout << "image processed" << std::endl;
+
+        outPort.prepare().copy(yarp::cv::fromCvMat<PixelBgr>(imgCV));
+        outPort.write();
     }
 
     return 0;
