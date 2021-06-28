@@ -192,7 +192,6 @@ RUN unzip models.zip && \
 WORKDIR /
 RUN git clone https://nicolocarissimi:13579aA!@github.com/event-driven-robotics/EDPR-APRIL.git && cd EDPR-APRIL && \
     git checkout openpose-yarp-docker && \
-    cd code && \
     mkdir build && cd build && \
     cmake .. && make
 
