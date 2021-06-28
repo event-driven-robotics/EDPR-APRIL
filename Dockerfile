@@ -195,4 +195,9 @@ RUN git clone https://nicolocarissimi:13579aA!@github.com/event-driven-robotics/
     mkdir build && cd build && \
     cmake .. && make
 
+# download demo data
+WORKDIR /data
+RUN wget https://istitutoitalianotecnologia.sharepoint.com/sites/EDPR-AVI/Documenti%20condivisi/General/april/shared_data/APRIL_WP61a_demo.tar.gz && \
+    tar -zxvf APRIL_WP61a_demo.tar.gz
+
 WORKDIR /EDPR-APRIL
