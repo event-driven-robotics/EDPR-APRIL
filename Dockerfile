@@ -175,4 +175,4 @@ ENV QT_X11_NO_MITSHM 1
 
 # add /usr/local/lib to the library path, so that libcaffe.so compiled with openpose will be used
 # instead of the one provided by the nvidia/cuda docker image
-RUN export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH /usr/local/lib:$LD_LIBRARY_PATH
