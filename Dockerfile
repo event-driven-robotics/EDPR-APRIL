@@ -15,6 +15,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 python3-dev python3-pip git g++ wget make libprotobuf-dev protobuf-compiler libopencv-dev \
 libgoogle-glog-dev libboost-all-dev libcaffe-cuda-dev libhdf5-dev libatlas-base-dev
 
+RUN apt-get install unzip
+
 # install editor
 RUN apt-get install -y nano
 
@@ -178,6 +180,20 @@ RUN git clone https://github.com/chentinghao/download_google_drive.git && \
 
 # extract downloaded models
 WORKDIR /openpose
-RUN apt-get install unzip && \
-    unzip models.zip && \
+RUN unzip models.zip && \
     rm models.zip
+
+
+#################
+# POSE DETECTOR #
+#################
+
+# download repository and compile the pose detector
+WORKDIR /
+RUN git clone https://nicolocarissimi:13579aA!@github.com/event-driven-robotics/EDPR-APRIL.git && cd EDPR-APRIL && \
+    git checkout openpose-yarp-docker && \
+    cd code && \
+    mkdir build && cd build && \
+    cmake .. && make
+
+WORKDIR /EDPR-APRIL
