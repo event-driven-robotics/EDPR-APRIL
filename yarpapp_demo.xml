@@ -11,7 +11,7 @@
 </module>
 
 <module>
-    <name> pose_detector.bin </name>
+    <name> pose_detector </name>
     <parameters> --model-folder /openpose/models </parameters>
     <node> localhost </node>
 </module>
