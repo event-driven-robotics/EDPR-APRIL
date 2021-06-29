@@ -188,3 +188,4 @@ RUN apt-get update && \
     tar -zxvf $DATA_FILE && rm $DATA_FILE
 
 WORKDIR /EDPR-APRIL
+RUN cp yarpapp_demo.xml /usr/local/share/yarp/applications
