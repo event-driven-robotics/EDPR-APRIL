@@ -15,10 +15,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 python3-dev python3-pip git g++ wget make libprotobuf-dev protobuf-compiler libopencv-dev \
 libgoogle-glog-dev libboost-all-dev libcaffe-cuda-dev libhdf5-dev libatlas-base-dev
 
-RUN apt-get install unzip
-
-# install editor
-RUN apt-get install -y nano
+# install utils
+RUN apt-get install -y unzip nano
 
 # replace cmake, as old version has CUDA variable bugs
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.16.0/cmake-3.16.0-Linux-x86_64.tar.gz && \
@@ -70,7 +68,7 @@ RUN echo "*************** building yarp ****************"
 ARG YARP_VERSION=3.4.4
 # ARG YCM_VERSION=0.11.1
 ARG YCM_VERSION=0.12.1
-ARG BUILD_TYPE=Debug
+ARG BUILD_TYPE=Release
 ARG SOURCE_FOLDER=/usr/local
 ARG OPENGL=0
 
