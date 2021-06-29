@@ -11,7 +11,7 @@
 </module>
 
 <module>
-    <name> pose_detector.bin </name>
+    <name> /EDPR-APRIL/code/build/pose_detector </name>
     <parameters> --model-folder /openpose/models --no_display true </parameters>
     <node> localhost </node>
 </module>
@@ -22,11 +22,11 @@
     <node> localhost </node>
 </module>
 
-<module>
-   <name> yarpview </name>
-   <parameters>--name /img_vis --x 30 --y 30 --h 720 --w 960 --synch --compact</parameters>
-   <node> localhost </node>
-</module>
+<!--<module>-->
+<!--   <name> yarpview </name>-->
+<!--   <parameters>&#45;&#45;name /img_vis &#45;&#45;x 30 &#45;&#45;y 30 &#45;&#45;h 720 &#45;&#45;w 960 &#45;&#45;synch &#45;&#45;compact</parameters>-->
+<!--   <node> localhost </node>-->
+<!--</module>-->
 
 <connection>
   <from> /atis3/img:o </from>
