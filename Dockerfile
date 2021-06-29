@@ -140,7 +140,8 @@ RUN cd $SOURCE_FOLDER && \
     cd event-driven && \
     git checkout v$EVENT_DRIVEN_VERSION && \
     mkdir build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+    cmake -DVLIB_CLOCK_PERIOD_NS=1000 \
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
           .. && \
     make install -j$(nproc)
 
@@ -188,4 +189,5 @@ RUN apt-get update && \
     tar -zxvf $DATA_FILE && rm $DATA_FILE
 
 WORKDIR /EDPR-APRIL
-RUN cp yarpapp_demo.xml /usr/local/share/yarp/applications
+RUN cp yarpapp_demo.xml /usr/local/share/yarp/applications && \
+    chmod +x launch_app.sh
