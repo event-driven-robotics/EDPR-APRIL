@@ -14,21 +14,11 @@ The software was tested on Ubuntu 20.04.2 LTS.
 - Place video frames recorded with [Yarp Data Dumper](https://www.yarp.it/git-master/yarpdatadumper.html) in a folder called `/data` (e.g. `//IITICUBNS010.iit.local/human_pose_estimation/Datasets/HVGA_pilots/01042021/exp2`, download only the `grayscale` folder containing the image frames)
 
 ## Usage
-- Open a terminal, run the Docker container and compile the pose detector
+- Open a terminal, run the Docker container and run yarpserver
     ```shell
     $ xhost +
-    $ docker run -it -v /abs/path/to/code/dir:/code -v /abs/path/to/data/dir:/data -v /tmp/.X11-unix/:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY --runtime=nvidia <image_id>
-    # inside the container
-    $ cd /code
-    $ mkdir build && cd build
-    $ cmake .. && make
-    ```
-
-- Open a new terminal and run the yarp server in the running container
-    ```shell
-    $ docker exec -it <container_id/container_name> bash  # executes a bash terminal in the running container
-    # inside the container
-    $ yarpserver
+    $ docker run -it -v /tmp/.X11-unix/:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY --runtime=nvidia <image_id>
+    $ yarpserver &
     ```
 
 - Open a new terminal and run the [Yarp Data Player](https://www.yarp.it/git-master/yarpdataplayer.html) in the running container
@@ -43,7 +33,7 @@ The software was tested on Ubuntu 20.04.2 LTS.
     - Select Option -> Repeat
     - Click on the play button
 
-- Run the pose detector in the terminal where it was compiled
+- Run the pose detector in the first opened terminal
     ```shell
     $ ./code/build/pose_detector --yarp-image-producer <data_player_port_name> --model-folder /openpose/models
     ```
