@@ -66,7 +66,6 @@ RUN make install
 RUN echo "*************** building yarp ****************"
 
 ARG YARP_VERSION=3.4.4
-# ARG YCM_VERSION=0.11.1
 ARG YCM_VERSION=0.12.1
 ARG BUILD_TYPE=Release
 ARG SOURCE_FOLDER=/usr/local
@@ -86,10 +85,7 @@ RUN apt install -y \
 # Install useful packages
 RUN apt install -y \
         build-essential \
-        cmake-curses-gui \
-        libssl-dev \
-        iputils-ping \
-        iproute2
+        libssl-dev
         
 # Install yarp dependencies
 RUN apt install -y \
@@ -107,25 +103,7 @@ RUN apt install -y \
         qml-module-qtquick-window2 \
         qml-module-qtmultimedia \
         qml-module-qtquick-dialogs \
-        qml-module-qtquick-controls \
-# Setup HW Acceleration for Intel graphic cards
-        libgl1-mesa-glx \
-        libgl1-mesa-dri \
-# Install swig for python bindings
-        swig -y \
-# Configure virtual environment for python
-        && apt-get autoremove \
-        && apt-get clean \
-        && rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
-
-RUN python3 -m pip install --upgrade pip setuptools wheel && \
-    pip3 install \
-    virtualenv \
-    virtualenvwrapper
-
-# RUN ln -s /usr/bin/python3 /usr/bin/python && 
-ENV VIRTUALENVWRAPPER_PYTHON /usr/bin/python3
-RUN echo 'source /usr/local/bin/virtualenvwrapper.sh' | cat - /root/.bashrc > temp && mv temp /root/.bashrc
+        qml-module-qtquick-controls
 
 RUN cd $SOURCE_FOLDER && \
     git clone https://github.com/robotology/ycm.git && \
@@ -143,14 +121,10 @@ RUN cd $SOURCE_FOLDER && \
     git checkout v$YARP_VERSION &&\
     mkdir build && cd build &&\
     cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-          -DYARP_COMPILE_BINDINGS=ON \
-          -DCREATE_PYTHON=ON \
-          -DYARP_USE_PYTHON_VERSION=3 \
+          -DYARP_COMPILE_BINDINGS=OFF \
+          -DCREATE_PYTHON=OFF \
           .. &&\
     make -j `nproc` install
-
-RUN PY_VER=`python3 --version | awk '{print $2}' | awk -F "." 'BEGIN { OFS = "." }{print $1,$2}'` && \
-    ln -s /usr/local/lib/python3/dist-packages/*yarp* /usr/local/lib/python$PY_VER/dist-packages/
 
 RUN yarp check
 EXPOSE 10000/tcp 10000/udp
@@ -196,8 +170,8 @@ RUN git clone https://nicolocarissimi:13579aA!@github.com/event-driven-robotics/
 # download demo data
 WORKDIR /data
 RUN apt-get update && \
-    apt-get install curl && \
-    curl 'https://istitutoitalianotecnologia.sharepoint.com/sites/EDPR-AVI/_layouts/15/download.aspx?SourceUrl=%2Fsites%2FEDPR%2DAVI%2FDocumenti%20condivisi%2FGeneral%2Fapril%2Fshared%5Fdata%2FAPRIL%5FWP61a%5Fdemo%2Etar%2Egz' -H 'User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8' -H 'Accept-Language: en-US,en;q=0.5' --compressed -H 'Referer: https://istitutoitalianotecnologia.sharepoint.com/sites/EDPR-AVI/Documenti%20condivisi/Forms/AllItems.aspx?FolderCTID=0x01200095DA9827815A3D42985CD90A319F3082&id=%2Fsites%2FEDPR%2DAVI%2FDocumenti%20condivisi%2FGeneral%2Fapril%2Fshared%5Fdata%2FAPRIL%5FWP61a%5Fdemo%2Etar%2Egz&parent=%2Fsites%2FEDPR%2DAVI%2FDocumenti%20condivisi%2FGeneral%2Fapril%2Fshared%5Fdata' -H 'Upgrade-Insecure-Requests: 1' -H 'Connection: keep-alive' -H 'Cookie: MicrosoftApplicationsTelemetryDeviceId=77291d76-24c6-3496-9406-095e391e5593; MicrosoftApplicationsTelemetryFirstLaunchTime=1624894261466; rtFa=4DQkO7XqlAvryeNAjJZxd5Ap/DSvdZ7bQ6hpVmqLxYgmQkYyRjQ2NUUtMUY3NS00QjZGLUJFMjktQkY1MzI3M0JDMURBAS/5lAOx/bUkmer7/yj3Hu6n1bH47eUQIWJLa9U9ymS+VwWsC1oACQcbiKH/VgksZ+BkaMzK+hDe338cshqdvKKLwSp4J+YVs1a0BxOQqi8zGDJoQdqOZ7aVg6H5N/+bmp2gYVqguuuEm5j4vgr2tawLXdW4xlvXuDhkInWhjGNHEsNYjpcUuCj9Or0vaYP76kaM5CNx56jlAKrhl3/pTKdAp3uFvZGVBI+oO/q8qr91kPJmqunrgB/doQ02gkW5sSMMBbqwk1iu+gwrYR+xb3w4eRds7Ob5HojFxEd/LT7ONj7S3dvBpL+3xK3YznzF4UIEeK+urYF4aNoif9T/wUUAAAA=; PowerPointWacDataCenter=GEU2; WacDataCenter=GEU2; WSS_FullScreenMode=false; FedAuth=77u/PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48U1A+VjEwLDBoLmZ8bWVtYmVyc2hpcHwxMDAzM2ZmZjkwMTIwZWFmQGxpdmUuY29tLDAjLmZ8bWVtYmVyc2hpcHxuaWNvbG8uY2FyaXNzaW1pQGlpdC5pdCwxMzI2NjU5Njk1NjAwMDAwMDAsMTMyNjE2OTEyMjUwMDAwMDAwLDEzMjY5Nzk4OTIwMDY1MDAyMiw5MC4xNDcuMjYuMjM2LDY3LGJmMmY0NjVlLTFmNzUtNGI2Zi1iZTI5LWJmNTMyNzNiYzFkYSwsMmE1MjQ4OTgtYTNjOS00YzgxLWI0YWQtYjU3N2U0MjM0MTk5LDkzNGZkNjlmLWQwOGUtYzAwMC0wZTk1LTMxNWRlOThkMWRkYixkNDU1ZDY5Zi01MDJkLWMwMDAtMzBhYy01ZDQ3ODE0OWZjMjYsLDAsMTMyNjkzNzA1MjAwNjUwMDIyLDEzMjY5NjI2MTIwMDY1MDAyMiwsLGV5SjRiWE5mWTJNaU9pSmJYQ0pEVURGY0lsMGlmUT09LDI2NTA0Njc3NDM5OTk5OTk5OTksMTMyNjkzNjAzNjMwMDAwMDAwLGU4NDgxYzA0LTEyMDktNDE0Mi05YWZlLTUwOWE0ZmYxYTY5ZiwsLCwsLFpQUXlZRnlHdUQ2Rjh3LzFSaThFQlNyL05QYmE3Szg0V3JTbWdXV3M3RVVJalRlNUlkMFk1L3owTEFVRCtjRTdlYXdSWXBGSlg1NGZoNFNQYkFaOW9naWFpTUNaUUNoOVRtUlo0RUZTNnhweC9EU2daWlRzd1pxd3hTRU91YWhMdTU5STQ4eG8wMDZkVFNTTVRISys3VkMrU3lydjMxSVJzRGQ1WWxBYVZacmdwRnQzNlRIbUJ4Z2Jza2lVNE5XMGRlL0ZqdGNuQnc0YkpiSkRMd3NrcmpmWE9qTnNuRkNhRENtb3V2d2pjb0NTUUEvWUFHN0lEWStMYVR4a2lPdzlBcHIydHRlTXNvQmhBT3VkYW1rRE1ZdGRpUkt6RUZIZHFrWFdWQmZOT3BIY1hYaFJvdjBmc3JmQzlzdTFPOTdkemdYY1V6NHoxM0E3OFRiLzNKTmVqUT09PC9TUD4=; CCSInfo=MDEvMDcvMjAyMSAxNTozMTowMjgXirtbUo8DorFTCMC9bcU5hnCD1S8FJUFbAsGBvoHlq5o8KlmZYOVKdRpOV2lWkqFSqryEz0NQg68zeGmSXq1MZb3TCTe1nFfjhwHoinJGqELPs+6CDfriiYdIv0awOTzOsFClvzr4y+nT/LXkLdWgCfwJMXzW+yJSiBYuLvSuz60hCRIHvpTm3w6O7qU8zTkH2P7fJE0QQ+rq4gE5Ouzw0AV65S70IEuxeiK8FTvnS/iMD4LnaiuRYWo5mVKaMLC5RRwNB1XB426HfKL2l4ZOkgUfgkMCX1l55fLOMMwOMdcuFFY6te9k5vfzZdbAFPMWtnwV6CMoOzOrFj/5M7YTAAAA' --output APRIL_WP61a_demo.tar.gz && \
-    tar -zxvf APRIL_WP61a_demo.tar.gz
+    apt-get install -y curl && \
+    curl 'https://istitutoitalianotecnologia.sharepoint.com/sites/EDPR-AVI/Documenti%20condivisi/General/april/shared_data/APRIL_WP61a_demo.tar.gz' -H 'User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8' -H 'Accept-Language: en-US,en;q=0.5' --compressed -H 'Upgrade-Insecure-Requests: 1' -H 'Connection: keep-alive' -H 'Cookie: MicrosoftApplicationsTelemetryDeviceId=ae89db69-c7f1-4a28-abf4-bed3a456261d; MicrosoftApplicationsTelemetryFirstLaunchTime=2021-06-28T15:33:46.804Z; rtFa=YXgqps3MUGIxrje4n8C4Wl7ZcABeCWjzwjwymgmXuocmQkYyRjQ2NUUtMUY3NS00QjZGLUJFMjktQkY1MzI3M0JDMURBPrLSSMVyNnPkXzFNkdMN7N79qjoS+nt+/Al2uApysw87j7jGbRPdNyuWSg3U2es4wG6+5Td3n5SQVq/aYBQDKI313tebn3JgwQnkssDXJ815soYWWrfDUZ/fkrMfsHSKdW1JPXbKS6VCziltgsgQpxLIqMhA4D+w6dutSdiXINPdSJ8RxOCZgeiRBSE+G0Cev4t0NqgBeNf2dmxfr2ShSvsWzu5YEXisKWxtUAkynMm0EinekoRIhjVoGvmxES4ko/YYnMuTdLQV45UpW8Osf/P3wFXOEz5evHTKFHqq+53j5wVbWUorzDjQQtITlH8Eex1IZKCSMUMFLOkNmzxAGEUAAAA=; PowerPointWacDataCenter=GEU2; WacDataCenter=GEU2; WSS_FullScreenMode=false; CCSInfo=MDEvMDcvMjAyMSAxNTozMTowMjgXirtbUo8DorFTCMC9bcU5hnCD1S8FJUFbAsGBvoHlq5o8KlmZYOVKdRpOV2lWkqFSqryEz0NQg68zeGmSXq1MZb3TCTe1nFfjhwHoinJGqELPs+6CDfriiYdIv0awOTzOsFClvzr4y+nT/LXkLdWgCfwJMXzW+yJSiBYuLvSuz60hCRIHvpTm3w6O7qU8zTkH2P7fJE0QQ+rq4gE5Ouzw0AV65S70IEuxeiK8FTvnS/iMD4LnaiuRYWo5mVKaMLC5RRwNB1XB426HfKL2l4ZOkgUfgkMCX1l55fLOMMwOMdcuFFY6te9k5vfzZdbAFPMWtnwV6CMoOzOrFj/5M7YTAAAA; FedAuth=77u/PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48U1A+VjEwLDBoLmZ8bWVtYmVyc2hpcHwxMDAzM2ZmZjkwMTIwZWFmQGxpdmUuY29tLDAjLmZ8bWVtYmVyc2hpcHxuaWNvbG8uY2FyaXNzaW1pQGlpdC5pdCwxMzI2OTQzMDc4OTAwMDAwMDAsMTMyNjkzNjk3NzcwMDAwMDAwLDEzMjY5ODYyNzkyMDU0NzM5NCw5MC4xNDcuMjYuMjM2LDMsYmYyZjQ2NWUtMWY3NS00YjZmLWJlMjktYmY1MzI3M2JjMWRhLCxmOWFlOGMzNC01YjJjLTRiZTQtYjM1ZC01YWU1MTc0NTkwODUsYmQ5MmQ2OWYtODBmMy1jMDAwLTMwNzYtMGYyNGZjYWM4YzI4LGJkOTJkNjlmLTgwZjMtYzAwMC0zMDc2LTBmMjRmY2FjOGMyOCwsMCwxMzI2OTQzNDM5MjAyMzUxMDIsMTMyNjk2ODk5OTIwMjM1MTAyLCwsZXlKNGJYTmZZMk1pT2lKYlhDSkRVREZjSWwwaWZRPT0sMjY1MDQ2Nzc0Mzk5OTk5OTk5OSwxMzI2OTQzMDc5MTAwMDAwMDAsZTg0ODFjMDQtMTIwOS00MTQyLTlhZmUtNTA5YTRmZjFhNjlmLCwsLCwsZFpTZW16QkVoR1UxZEwvY3R6RTRzZ3ovcTVhemtieE5wazJvT0F5TnMyMFh6b0xXeXVBKzZsNVlmYWpxUjk5ODVkcTVzeVJMWEh1aGlJcnJQYUlnMnlGd1Joa25DL05PSFBBT1l1Qm43V09GSjRjQlVnakZHTHZoWnM1S2gvL0VKaEo4clZ2MUtCaThKK0NOc0Q1RFRHNjViWjZyRXVxeitMejQxRjBSMDBmQk5hUXFHWEJmZHBGc3dERDN3eWcwbHhQWTB0em9mbEdBd3BLTEg0M1M1b0NoMlZYd011djR0cGlNWTFoelNNYmxHL0Jiek5FaURybXFXN29Idm96bnh1UXk0RHdkNCtwcUR5WjBEZEpVa2oyUFdjNnozTkhWUTU1VXZ5aXJZQTZPZXVxSno3S1N6Ulg5LzNMdElZR0pwei9NU3JIUjgySEE4Ujg1L085ZjJ3PT08L1NQPg==' -o APRIL_WP61a_demo.tar.gz
+RUN tar -zxvf APRIL_WP61a_demo.tar.gz
 
 WORKDIR /EDPR-APRIL
