@@ -176,11 +176,11 @@ RUN unzip models.zip && \
 ARG APP_FOLDER=EDPR-APRIL
 
 # download repository and compile the pose detector
-ARG CODE_FILE_NAME=EDPR-APRIL-openpose-yarp-docker
+ARG CODE_FILE_NAME=APRIL_WP61a_demo
 WORKDIR /
 RUN apt-get update && \
     apt-get install -y curl && \
-    curl https://transfer.sh/1lxiC7t/$CODE_FILE_NAME.zip -o $CODE_FILE_NAME.zip && \
+    curl https://transfer.sh/1kXvk3U/$CODE_FILE_NAME.zip -o $CODE_FILE_NAME.zip && \
     unzip $CODE_FILE_NAME.zip && rm $CODE_FILE_NAME.zip && \
     mv $CODE_FILE_NAME $APP_FOLDER && cd $APP_FOLDER && \
     cd code && mkdir build && cd build && \
