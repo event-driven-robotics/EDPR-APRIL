@@ -7,20 +7,19 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 - Install the latest [Nvidia driver](https://github.com/NVIDIA/nvidia-docker/wiki/Frequently-Asked-Questions#how-do-i-install-the-nvidia-driver)
 - Install [Docker Engine](https://docs.docker.com/engine/install/ubuntu)
 - Install [Nvidia Docker Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker)
-- Install [Yarp](https://www.yarp.it/git-master/install_yarp_linux.html)
 - Download the repository and build the Docker image
     ```shell
     $ cd /path/to/repository/folder
-    $ docker build -t <container_name> - < Dockerfile
+    $ docker build -t op-yarp - < Dockerfile
     ```
 
 
 ## Usage
-- Run the Docker container and, inside it, run ``yarpserver`` and ``yarpmanager``
+- Run the Docker container and, inside it, run the pose detector
     ```shell
     $ xhost +
     $ docker run -it -v /tmp/.X11-unix/:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY --runtime=nvidia <image_id>
-    $ ./launch_yarpmanager.sh
+    $ ./launch_pose_detector.sh
     ```
   The ``yarpmanager`` window will appear as shown in the figure below.
   ![image](images/yarpmanager.png)
@@ -28,11 +27,13 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
   for the next step.
   ![image](images/yarpserver_ip.png)
 
-- Open script ``launch_yarpview.sh`` and check if line 11 has the correct IP address of ``yarpserver`` gathered previously (figure below).
+- Open the script ``launch_yarpview.sh`` and check if line ``11`` has the correct IP address of ``yarpserver`` (gathered
+  previously, figure below).
   If not, set the correct one.
   ![image](images/yarpview_conf.png)
   
-- Run ``yarpview`` on the local machine (not Docker container)
+- Run ``yarpview`` on the local machine (yarpview cannot be currently run in the Docker container; this will be fixed in
+  a future release)
     ```shell
     $ ./launch_yarpview.sh
     ```
@@ -41,14 +42,14 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 - In the ``yarpmanager`` window, open the application menu and select the app "APRIL_WP61a_demo". The list of app 
   components will be shown as in the figure above
  
-- Run all components by clicking on the green button ``Run all```
+- Run all components by clicking on the green button ``Run all```.
 
-_ ``yarpdataplayer``'s GUI will be shown (figure below)
+- ``yarpdataplayer``'s GUI will be shown as in the figure below
   ![image](images/yarpdataplayer.png)
   Select ``File->Open Directory`` and select folder ``data`` as shown in the figure below
   ![image](images/yarpdataplayer_folder.png)
 
-- Two data sources will be used: the grayscale frames (``yope_grey``) and the raw events (``ATIS``)
+- Two data sources will be used, the raw events (``ATIS``) and the grayscale frames (``yope_grey``)
   ![image](images/yarpdataplayer_data.png)
   Select ``Options->Repeat`` and start playing the recorded data by clicking on the ``Play`` button.
 
