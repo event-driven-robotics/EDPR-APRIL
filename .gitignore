@@ -7,6 +7,8 @@
 .idea/vcs.xml
 .idea/inspectionProfiles/profiles_settings.xml
 
+.vscode/
+
 code/build
 code/build/cmake_install.cmake
 code/build/CMakeCache.txt
@@ -39,4 +41,4 @@ code/build/CMakeFiles/test.bin.dir/link.txt
 code/build/CMakeFiles/test.bin.dir/progress.make
 code/build/CMakeFiles/test.bin.dir/test.cpp.o
 
-.vscode/
+data/

@@ -194,4 +194,4 @@ RUN curl https://transfer.sh/1zENaoD/$DATA_FILE -o $DATA_FILE && \
 
 WORKDIR /$APP_FOLDER
 RUN cp yarpapp_demo.xml /usr/local/share/yarp/applications && \
-    chmod +x launch_app.sh
+    chmod +x launch_yarpmanager.sh
