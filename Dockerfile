@@ -173,21 +173,25 @@ RUN unzip models.zip && \
 # POSE DETECTOR #
 #################
 
+ARG APP_FOLDER=EDPR-APRIL
+
 # download repository and compile the pose detector
+ARG CODE_FILE_NAME=EDPR-APRIL-openpose-yarp-docker
 WORKDIR /
-RUN git clone https://nicolocarissimi:13579aA!@github.com/event-driven-robotics/EDPR-APRIL.git && cd EDPR-APRIL && \
-    git checkout openpose-yarp-docker && \
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl https://transfer.sh/1lxiC7t/$CODE_FILE_NAME.zip -o $CODE_FILE_NAME.zip && \
+    unzip $CODE_FILE_NAME.zip && rm $CODE_FILE_NAME.zip && \
+    mv $CODE_FILE_NAME $APP_FOLDER && cd $APP_FOLDER && \
     cd code && mkdir build && cd build && \
     cmake .. && make
 
 # download demo data
 ARG DATA_FILE=APRIL_WP61a_demo.tar.gz
 WORKDIR /data
-RUN apt-get update && \
-    apt-get install -y curl && \
-    curl https://transfer.sh/1zENaoD/$DATA_FILE -o $DATA_FILE && \
+RUN curl https://transfer.sh/1zENaoD/$DATA_FILE -o $DATA_FILE && \
     tar -zxvf $DATA_FILE && rm $DATA_FILE
 
-WORKDIR /EDPR-APRIL
+WORKDIR /$APP_FOLDER
 RUN cp yarpapp_demo.xml /usr/local/share/yarp/applications && \
     chmod +x launch_app.sh
