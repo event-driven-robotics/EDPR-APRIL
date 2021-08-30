@@ -169,6 +169,30 @@ RUN unzip models.zip && \
     rm models.zip
 
 
+#######################
+# set github ssh keys #
+#######################
+ARG ssh_prv_key
+ARG ssh_pub_key
+
+RUN apt-get update && \
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    openssh-server \
+    libmysqlclient-dev \
+    ffmpeg libsm6 libxext6
+
+# Authorize SSH Host
+RUN mkdir -p /root/.ssh && \
+    chmod 0700 /root/.ssh && \
+    ssh-keyscan github.com > /root/.ssh/known_hosts
+
+# Add the keys and set permissions
+RUN echo "$ssh_prv_key" > /root/.ssh/id_rsa && \
+    echo "$ssh_pub_key" > /root/.ssh/id_rsa.pub && \
+    chmod 600 /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa.pub
+
+
 #################
 # POSE DETECTOR #
 #################
@@ -178,20 +202,10 @@ ARG APP_FOLDER=EDPR-APRIL
 # download repository and compile the pose detector
 ARG CODE_FILE_NAME=APRIL_WP61a_demo
 WORKDIR /
-RUN apt-get update && \
-    apt-get install -y curl && \
-    curl https://transfer.sh/1kXvk3U/$CODE_FILE_NAME.zip -o $CODE_FILE_NAME.zip && \
-    unzip $CODE_FILE_NAME.zip && rm $CODE_FILE_NAME.zip && \
-    mv $CODE_FILE_NAME $APP_FOLDER && cd $APP_FOLDER && \
-    cd code && mkdir build && cd build && \
+RUN git clone git@github.com:event-driven-robotics/EDPR-APRIL.git && \
+    cd EDPR-APRIL && \
+    git checkout openpose-yarp-docker && \
+    cd code && mkdir build && \
     cmake .. && make
 
-# download demo data
-ARG DATA_FILE=APRIL_WP61a_demo.tar.gz
-WORKDIR /data
-RUN curl https://transfer.sh/1zENaoD/$DATA_FILE -o $DATA_FILE && \
-    tar -zxvf $DATA_FILE && rm $DATA_FILE
-
-WORKDIR /$APP_FOLDER
-RUN cp yarpapp_demo.xml /usr/local/share/yarp/applications && \
-    chmod +x launch_yarpmanager.sh
+WORKDIR /EDPR-APRIL/code/build

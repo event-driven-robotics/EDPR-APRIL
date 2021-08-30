@@ -44,3 +44,7 @@ include_directories(${OpenPose_INCLUDE_DIRS} ${GFLAGS_INCLUDE_DIR} ${GLOG_INCLUD
 add_executable(pose_detector pose_detector.cpp)
  
 target_link_libraries(pose_detector ${OpenPose_LIBS} ${GFLAGS_LIBRARY} ${GLOG_LIBRARY} ${OpenCV_LIBS} YARP::YARP_cv YARP::YARP_os YARP::YARP_sig YARP::YARP_init)
+
+add_executable(pose_detector_json pose_detector_json.cpp)
+
+target_link_libraries(pose_detector_json ${OpenPose_LIBS} ${GFLAGS_LIBRARY} ${GLOG_LIBRARY} ${OpenCV_LIBS} "stdc++fs")
