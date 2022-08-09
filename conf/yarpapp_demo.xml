@@ -1,0 +1,56 @@
+<application>
+<name> APRIL_WP61a_demo </name>
+
+<dependencies>
+</dependencies>
+
+<module>
+    <name> yarpdataplayer </name>
+    <parameters>  </parameters>
+    <node> localhost </node>
+</module>
+
+<module>
+    <name> /EDPR-APRIL/code/build/pose_detector </name>
+    <parameters> --model-folder /openpose/models --no_display true </parameters>
+    <node> localhost </node>
+</module>
+
+<module>
+    <name> vFramerLite </name>
+    <parameters> --displays "(/events (F AE ISO))" --height 360 --width 480 </parameters>
+    <node> localhost </node>
+</module>
+
+<!--<module>-->
+<!--   <name> yarpview </name>-->
+<!--   <parameters>&#45;&#45;name /img_vis &#45;&#45;x 30 &#45;&#45;y 30 &#45;&#45;h 720 &#45;&#45;w 960 &#45;&#45;synch &#45;&#45;compact</parameters>-->
+<!--   <node> localhost </node>-->
+<!--</module>-->
+
+<connection>
+  <from> /atis3/img:o </from>
+  <to> /pose_detector/img:i </to>
+  <protocol>fast_tcp</protocol>
+</connection>
+
+<connection>
+  <from>/pose_detector/img:o</from>
+  <to>/vFramer/events/frame:i</to>
+  <protocol>fast_tcp</protocol>
+</connection>
+
+<connection>
+  <from>/atis3/AE:o</from>
+  <to>/vFramer/events/AE:i</to>
+  <protocol> fast_tcp </protocol>
+</connection>
+
+<connection>
+  <from>/vFramer/events/image:o</from>
+  <to>/img_vis</to>
+  <protocol> fast_tcp </protocol>
+</connection>
+
+
+</application>
