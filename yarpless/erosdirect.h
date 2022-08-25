@@ -66,13 +66,6 @@ public:
 
         double t = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 
-
-        
-        // auto start = high_resolution_clock::now();
-        // auto stop = high_resolution_clock::now();
-        // auto duration = duration_cast<seconds>(start-stop);
-        // std::chrono::system_clock::time_point t = duration_cast<seconds>(std::chrono::system_clock::now());
-        //int t = 0;
         for(auto &v = ev_begin; v != ev_end; ++v) 
         {
             float &pt = filter.at<float>(v->y, v->x);
