@@ -43,18 +43,16 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 - At the terminal inside the container run the following commands
   ```shell 
   $ yarpserver &
-  $ yarpdataplayer &
+  $ atis-bridge-sdk --s 60 --filter 0.01 &
   ```
   :warning: the `&` runs the process in the background enabling a single terminal to run all three processes. Use the command `fg` to bring a background process back to the foreground
-
-- In the `yarpdataplayer` GUI use `File->Open` and navigate to the `EDPR-APRIL` repository and load the example dataset.
 
 - At the terminal inside the container run the following commands. The HPE application should run and a visualisation window should appear. The application should automatically connect to required input and output YARP modules.
   ```shell 
   $ edpr-april
   ```
 
-- Press play on the `yarpdataplayer`. The application should run with default parameters, using moveEnet detector at 10 Hz, without the latency compensation.
+- The application should run with default parameters, using moveEnet detector at 10 Hz, without the latency compensation.
 
 - While the visualisation window is selected:
   - Press `d` to visualise the detections (on and off)
