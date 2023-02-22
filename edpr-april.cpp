@@ -136,7 +136,7 @@ public:
         }
 
         // =====READ PARAMETERS=====
-        movenet = rf.check("movenet") && rf.check("movenet", Value(true)).asBool();
+        movenet = true;
 
         alt_view = rf.check("alt_view") && rf.check("alt_view", Value(true)).asBool();
         detF = rf.check("detF", Value(10)).asInt32();
