@@ -41,8 +41,9 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 :bulb: use `-v <local_dir>:<container_dir>` to mount further folders inside the container in order to transfer data between your local machine and the container, if needed.
 
 - At the terminal inside the container run the following commands
-  ```shell 
-  $ yarpserver &
+  ```shell
+  $ export ROS_MASTER_URI=http://<localhost-ip>:11311
+  $ yarpserver --ros&
   $ atis-bridge-sdk --s 60 --filter 0.01 &
   ```
   :warning: the `&` runs the process in the background enabling a single terminal to run all three processes. Use the command `fg` to bring a background process back to the foreground
