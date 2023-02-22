@@ -156,7 +156,9 @@ public:
         if (movenet) {
             // run python code for movenet
             int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py &");
-            sleep(10);
+            while (!yarp::os::NetworkBase::exists("/movenet/sklt:o"))
+                sleep(1);
+            yInfo() << "MoveEnet started correctly";
             if (!mn_handler.init(getName("/eros:o"), getName("/movenet:i"), detF)) {
                 yError() << "Could not open movenet ports";
                 return false;
