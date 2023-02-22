@@ -52,18 +52,17 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
   $ edpr-april
   ```
 
-- Press play on the `yarpdataplayer`. The application should run with default parameters, using moveEnet as a detector at 10 Hz.
+- Press play on the `yarpdataplayer`. The application should run with default parameters, using moveEnet detector at 10 Hz, without the latency compensation.
 
 - While the visualisation window is selected:
   - Press `d` to visualise the detections (on and off)
   - Press `v` to visualise the joint velocities (on and off)
-  - Press `e` to visualise alternate representations (eros and events)
+  - Press `e` to visualise alternate representations (toggle between eros and events)
   - Press `ESC` to close
 
 - The following command line options can be used `edpr-april --OPTION VALUE`
-  - `--movenet` to use moveEnet detector
   - `--use_lc` to use latency compensation in the fusion
-  - `--detF <INT>` to modify the moveEnet detection rate []
+  - `--detF <INT>` to modify the moveEnet detection rate [10]
   - `--w <INT> --h <INT>` to set the dataset sensor resolution [640 480]
   - `--roi <INT>` to set the joint region-of-interest [20]
   - `--pu <FLOAT> --muD <FLOAT>` to set the Kalman filter process and measurement uncertainty [0.001, 0.0004]
