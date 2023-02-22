@@ -43,7 +43,7 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 - At the terminal inside the container run the following commands
   ```shell
   $ export ROS_MASTER_URI=http://<localhost-ip>:11311
-  $ yarpserver --ros&
+  $ yarpserver --ros &
   $ atis-bridge-sdk --s 60 --filter 0.01 &
   ```
   :warning: the `&` runs the process in the background enabling a single terminal to run all three processes. Use the command `fg` to bring a background process back to the foreground
