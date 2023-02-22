@@ -13,6 +13,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
+#include "yarp/rosmsg/Vjxoutput.h"
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -110,6 +111,11 @@ private:
     bool alt_view{false}, pltVel{false}, pltDet{false};
     bool latency_compensation{true};
     double th_period{0.01};
+
+    // ros 
+    yarp::os::Node* ros_node{nullptr};
+    yarp::os::Publisher<yarp::rosmsg::Vjxoutput> ros_publisher;
+    yarp::rosmsg::Vjxoutput ros_output;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -210,6 +216,16 @@ public:
 
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", cv::Size(640, 480));
+
+        
+        // set-up ROS interface
+        ros_node = new yarp::os::Node("/APRIL");
+        if(!ros_publisher.topic(getName("/output2ros"))) {
+            yError() << "Could not open ROS output publisher";
+            return false;
+        }
+        else 
+            yInfo() << "ROS output publisher: OK";
 
         asynch_thread = std::thread([this]{ this->run_opixels(); });
 
@@ -315,9 +331,9 @@ public:
         ev::info event_stats = {0};
         double latency = 0.0;
         hpecore::stampedPose detected_pose;
-
         input_events.readPacket(true);
         double t0 = Time::now();
+        std:vector<double> sklt_out, vel_out;
 
         while (!isStopping())
         {
@@ -373,7 +389,23 @@ public:
 
             skelwriter.write({tnow, latency, state.query()});
             velwriter.write({tnow, latency, skel_vel});
-            
+
+            // format skeleton to ros output
+            sklt_out.clear();
+            vel_out.clear();
+            for (int j = 0; j < 13; j++)
+            {
+                sklt_out.push_back(skeleton_detection[j].u);
+                sklt_out.push_back(skeleton_detection[j].v);
+                vel_out.push_back(skel_vel[j].u);
+                vel_out.push_back(skel_vel[j].v);
+            }
+            ros_output.timestamp = tnow;
+            ros_output.pose = sklt_out;
+            ros_output.velocity = vel_out;
+            // publish data
+            ros_publisher.prepare() = ros_output;
+            ros_publisher.write();
         }
     }
 };
