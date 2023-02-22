@@ -40,17 +40,9 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 
 :bulb: use `-v <local_dir>:<container_dir>` to mount further folders inside the container in order to transfer data between your local machine and the container, if needed.
 
-- At the terminal inside the container run the following commands
-  ```shell
-  $ export ROS_MASTER_URI=http://<localhost-ip>:11311
-  $ yarpserver --ros &
-  $ atis-bridge-sdk --s 60 --filter 0.01 &
-  ```
-  :warning: the `&` runs the process in the background enabling a single terminal to run all three processes. Use the command `fg` to bring a background process back to the foreground
-
-- At the terminal inside the container run the following commands. The HPE application should run and a visualisation window should appear. The application should automatically connect to required input and output YARP modules.
+- At the terminal inside the container run the following command to execute a script that will set up a yarpserver connected to ROS, run the atis-bridge to get the events from the camera and finally run the HPE application with a visualisation window. The application should automatically connect to required input and output YARP modules.
   ```shell 
-  $ edpr-april
+  $ ./run_april
   ```
 
 - The application should run with default parameters, using moveEnet detector at 10 Hz, without the latency compensation.
@@ -72,3 +64,7 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
   - `--velpath  <STRING>` to save a `.csv` of joint velocities at a provided file location
   - `--v <STRING>` to save a video at a provided file location
 
+To stop the application itself, the camera and the yarpserver, the follwoing command should be run in a temrinal inside the docker:
+```shell 
+$ ./kill_april
+```
