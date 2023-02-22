@@ -8,7 +8,6 @@ Author: Franco Di Pietro, Arren Glover
 #include <event-driven/core.h>
 #include <hpe-core/utility.h>
 #include <hpe-core/motion_estimation.h>
-#include <hpe-core/openpose_detector.h>
 #include <hpe-core/fusion.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
