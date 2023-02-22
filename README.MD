@@ -19,15 +19,17 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 - Download the repository and build the Docker image
     ```shell
     $ cd <workspace>
-    $ git clone https://github.com/event-driven-robotics/EDPR-APRIL
+    $ git clone git@github.com:event-driven-robotics/EDPR-APRIL.git
     $ cd EDPR-APRIL
-    $ docker build -t event-pose --ssh default --build-arg ssh_pub_key="$(cat ~/.ssh/<publicKeyFile>.pub)" --build-arg ssh_prv_key="$(cat ~/.ssh/<privateKeyFile>)" - < Dockerfile
+    $ docker build -t event-pose --ssh default --build-arg ssh_pub_key="$(cat ~/.ssh/id_rsa.pub)" --build-arg ssh_prv_key="$(cat ~/.ssh/id_rsa>)" - < Dockerfile
     ```
 :bulb: `<workspace>` is the parent directory in which the repository is cloned
 
 :bulb: The ssh keys are required to access and build this repository from within the docker, as it is currently private. [Create a new ssh key](https://docs.github.com/en/github/authenticating-to-github/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) if required.
 
 :warning: Ensure your ssh key is built without a passphrase.
+
+:bulb: Your ssh key may have a different name (e.g. id_ed25519.pub). Change in the command as necessary.
 
 ## Usage
 - Run the Docker container and, inside it, run the pose detector
