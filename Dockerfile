@@ -147,7 +147,7 @@ RUN cd $SOURCE_FOLDER && \
     
 # install hpe-core
 RUN cd $SOURCE_FOLDER && \
-    git clone --branch $HPE_VERSION git@github.com:event-driven-robotics/hpe-core.git &&\
+    git clone --depth 1 --branch $HPE_VERSION git@github.com:event-driven-robotics/hpe-core.git &&\
     cd hpe-core/core && mkdir build && cd build && \
     cmake .. && make install -j$(nproc)
 
