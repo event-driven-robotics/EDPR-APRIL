@@ -127,7 +127,7 @@ public:
         }
 
         // set the module name used to name ports
-        setName((rf.check("name", Value("/edpr-april")).asString()).c_str());
+        setName((rf.check("name", Value("/edpr_april")).asString()).c_str());
 
         if (!input_events.open(getName("/AE:i")))
         {
