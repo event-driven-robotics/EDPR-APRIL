@@ -8,6 +8,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <event-driven/core.h>
 #include <hpe-core/utility.h>
 #include <hpe-core/motion_estimation.h>
+#include <hpe-core/saevel.h>
 #include <hpe-core/fusion.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -89,6 +90,7 @@ private:
 
     //velocity and fusion
     hpecore::pwvelocity pw_velocity;
+    hpecore::saevel svel;
     hpecore::multiJointLatComp state;
 
     //internal data structures
@@ -98,6 +100,8 @@ private:
     cv::Size image_size;
     cv::Mat vis_image;
     cv::Mat edpr_logo;
+    cv::Mat heat_map;
+    cv::Mat sae_vis;
 
     //recording results
     hpecore::writer skelwriter, velwriter;
@@ -168,11 +172,14 @@ public:
         // ===== SET UP INTERNAL VARIABLE/DATA STRUCTURES =====
 
         //shared images
+        heat_map = cv::Mat(image_size, CV_8UC3, cv::Vec3b(0, 0, 0));
+        sae_vis = cv::Mat(image_size, CV_8UC3, cv::Vec3b(0, 0, 0));
         vis_image = cv::Mat(image_size, CV_8UC3, cv::Vec3b(0, 0, 0));
         edpr_logo = cv::imread("/usr/local/src/wp5-hpe/edpr_logo.png");
         
         //velocity estimation
         pw_velocity.setParameters(image_size, 7, 0.3, 0.01);
+        svel.initialise(image_size.width, image_size.height);
 
         //fusion
         if(!state.initialise({procU, measUD, measUV, lc}))
@@ -304,7 +311,9 @@ public:
 
         if (output_video.isOpened())
             output_video << canvas;
-
+        sae_vis = svel.makeImage();
+        cv::imshow("sae", sae_vis);
+        cv::imshow("heat map", heat_map);
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
         if(key_pressed > 0)
@@ -373,17 +382,16 @@ public:
             }
             
             pw_velocity.update(input_events.begin(), input_events.end(), tnow);
+            svel.update(input_events.begin(), input_events.end());
 
             //only update velocity if the pose is initialised
             if(!state.poseIsInitialised())
                 continue;
 
-            skel_vel = pw_velocity.query(state.query(), 20, 2, state.queryVelocity());
-
-            //this scaler was thought to be from timestamp misconversion.
-            //instead we aren't sure why it is needed.
-            for (int j = 0; j < 13; j++)  // (F) overload * to skeleton13
-                skel_vel[j] = skel_vel[j] * scaler;
+            skel_vel = {0};
+            hpecore::joint hand = state.query()[hpecore::coco::handR];
+            skel_vel[hpecore::coco::handR] = svel.convolution(hand.u, hand.v, 10, heat_map);
+            svel.conlude_update();
 
             state.setVelocity(skel_vel);
             state.updateFromVelocity(skel_vel, tnow);
