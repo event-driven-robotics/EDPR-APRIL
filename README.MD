@@ -21,7 +21,7 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
     $ cd <workspace>
     $ git clone git@github.com:event-driven-robotics/EDPR-APRIL.git
     $ cd EDPR-APRIL
-    $ docker build -t event-pose --ssh default --build-arg ssh_pub_key="$(cat ~/.ssh/id_rsa.pub)" --build-arg ssh_prv_key="$(cat ~/.ssh/id_rsa>)" - < Dockerfile
+    $ docker build -t event-pose --ssh default --build-arg ssh_pub_key="$(cat ~/.ssh/id_rsa.pub)" --build-arg ssh_prv_key="$(cat ~/.ssh/id_rsa)" - < Dockerfile
     ```
 :bulb: `<workspace>` is the parent directory in which the repository is cloned
 
