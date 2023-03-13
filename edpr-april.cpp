@@ -1,4 +1,4 @@
-/* 
+/*
 Author: Franco Di Pietro, Arren Glover
  */
 
@@ -21,21 +21,19 @@ using std::vector;
 class externalDetector
 {
 private:
-    
     double period{0.1}, tic{0.0};
     bool waiting{false};
 
-    BufferedPort<ImageOf<PixelMono> > output_port;
-    BufferedPort<Bottle>               input_port;
-    
-public:
+    BufferedPort<ImageOf<PixelMono>> output_port;
+    BufferedPort<Bottle> input_port;
 
+public:
     bool init(std::string output_name, std::string input_name, double rate)
     {
-        if(!output_port.open(output_name))
+        if (!output_port.open(output_name))
             return false;
-        
-        if(!input_port.open(input_name))
+
+        if (!input_port.open(input_name))
             return false;
 
         period = 1.0 / rate;
@@ -49,8 +47,8 @@ public:
 
     bool update(cv::Mat latest_image, double latest_ts, hpecore::stampedPose &previous_skeleton)
     {
-        //send an update if the timer has elapsed
-        if((!waiting && latest_ts - tic > period) || (latest_ts - tic > 2.0)) 
+        // send an update if the timer has elapsed
+        if ((!waiting && latest_ts - tic > period) || (latest_ts - tic > 2.0))
         {
             static cv::Mat cv_image;
             cv::GaussianBlur(latest_image, cv_image, cv::Size(5, 5), 0, 0);
@@ -60,7 +58,7 @@ public:
             waiting = true;
         }
 
-        //read a ready data
+        // read a ready data
         Bottle *mn_container = input_port.read(false);
         if (mn_container)
         {
@@ -74,24 +72,71 @@ public:
     }
 };
 
+class delayedGT
+{
+private:
+    bool delay{false};
+    double rate{10};
+    BufferedPort<Bottle> input_port;
+    hpecore::stampedPose internal{0.0, -1.0, {0}};
+
+public:
+    bool init(std::string input_name, double rate, bool delay)
+    {
+        if (!input_port.open(input_name))
+            return false;
+
+        this->delay = delay;
+        this->rate = rate;
+        return true;
+    }
+    void close()
+    {
+        input_port.close();
+    }
+
+    bool update(double latest_ts, hpecore::stampedPose &previous_skeleton)
+    {
+        Bottle *gt_container = input_port.read(false);
+        if (gt_container && (rate * (latest_ts - internal.timestamp) > 1.0))
+        {
+            // if we have delay set the previous result to be returned
+            if (delay)
+                previous_skeleton = internal;
+
+            // grab the new skeleton and set the timestamp to now
+            internal.pose = hpecore::extractSkeletonFromYARP<Bottle>(*gt_container);
+            internal.timestamp = latest_ts;
+
+            // if we don't delay set the current result to be returned
+            if (!delay)
+                previous_skeleton = internal;
+
+            // the delay is the difference between now and returned timestamp
+            previous_skeleton.delay = latest_ts - previous_skeleton.timestamp;
+            return true;
+        }
+        return false;
+    }
+};
 
 class isaacHPE : public RFModule
 {
 
 private:
-
-    //event reading
+    // event reading
     std::thread asynch_thread;
     ev::window<ev::AE> input_events;
 
-    //detection handlers
+    // detection handlers
     externalDetector mn_handler;
+    delayedGT gt_handler;
 
-    //velocity and fusion
+    // velocity and fusion
     hpecore::pwvelocity pw_velocity;
     hpecore::multiJointLatComp state;
 
-    //internal data structures
+    // internal data structures
     hpecore::skeleton13 skeleton_gt{0};
     hpecore::skeleton13 skeleton_detection{0};
 
@@ -99,20 +144,20 @@ private:
     cv::Mat vis_image;
     cv::Mat edpr_logo;
 
-    //recording results
+    // recording results
     hpecore::writer skelwriter, velwriter;
     cv::VideoWriter output_video;
 
-    //parameters
-    bool movenet{false};
+    // parameters
+    bool movenet{false}, use_gt{false};
     int detF{10}, roiSize{20};
     double scaler{12.5};
-    bool alt_view{false}, pltVel{false}, pltDet{false}, gpu{false};
-    bool latency_compensation{true};
+    bool alt_view{false}, pltVel{false}, pltDet{false}, gpu{false}, ros{false};
+    bool latency_compensation{true}, delay{false};
     double th_period{0.01};
 
-    // ros 
-    yarp::os::Node* ros_node{nullptr};
+    // ros
+    yarp::os::Node *ros_node{nullptr};
     yarp::os::Publisher<yarp::rosmsg::Vjxoutput> ros_publisher;
     yarp::rosmsg::Vjxoutput ros_output;
 
@@ -136,10 +181,12 @@ public:
         }
 
         // =====READ PARAMETERS=====
-        movenet = true;
-
+        movenet = rf.check("movenet") && rf.check("movenet", Value(true)).asBool();
+        use_gt = !movenet ? true : false;
+        delay = rf.check("delay") && rf.check("delay", Value(true)).asBool();
         alt_view = rf.check("alt_view") && rf.check("alt_view", Value(true)).asBool();
         gpu = rf.check("gpu") && rf.check("gpu", Value(true)).asBool();
+        ros = rf.check("ros") && rf.check("ros", Value(true)).asBool();
         detF = rf.check("detF", Value(10)).asInt32();
 
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
@@ -154,16 +201,27 @@ public:
         scaler = rf.check("sc", Value(12.5)).asFloat64();
 
         // ===== SET UP DETECTOR METHOD =====
-        if (movenet) {
+        if (use_gt)
+        {
+            if (!gt_handler.init(getName("/gt:i"), detF, delay))
+            {
+                yError() << "Could not open input port";
+                return false;
+            }
+        }
+
+        if (movenet)
+        {
             // run python code for movenet
-            if(gpu)
+            if (gpu)
                 int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py --gpu &");
             else
                 int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py &");
             while (!yarp::os::NetworkBase::exists("/movenet/sklt:o"))
                 sleep(1);
             yInfo() << "MoveEnet started correctly";
-            if (!mn_handler.init(getName("/eros:o"), getName("/movenet:i"), detF)) {
+            if (!mn_handler.init(getName("/eros:o"), getName("/movenet:i"), detF))
+            {
                 yError() << "Could not open movenet ports";
                 return false;
             }
@@ -171,20 +229,20 @@ public:
 
         // ===== SET UP INTERNAL VARIABLE/DATA STRUCTURES =====
 
-        //shared images
+        // shared images
         vis_image = cv::Mat(image_size, CV_8UC3, cv::Vec3b(0, 0, 0));
         edpr_logo = cv::imread("/usr/local/src/wp5-hpe/edpr_logo.png");
-        
-        //velocity estimation
+
+        // velocity estimation
         pw_velocity.setParameters(image_size, 7, 0.3, 0.01);
 
-        //fusion
-        if(!state.initialise({procU, measUD, measUV, lc}))
+        // fusion
+        if (!state.initialise({procU, measUD, measUV, lc}))
         {
             yError() << "Not KF initialized";
             return false;
         }
-        
+
         // ===== SET UP RECORDING =====
         if (rf.check("filepath"))
         {
@@ -199,13 +257,15 @@ public:
                 yInfo() << "saving velocity data to:" << velpath;
         }
 
-        if (rf.check("v")) {
+        if (rf.check("v"))
+        {
             std::string videopath = rf.find("v").asString();
             if (!output_video.open(videopath,
                                    cv::VideoWriter::fourcc('H', '2', '6', '4'),
-                                   (int)(0.1/th_period),
+                                   (int)(0.1 / th_period),
                                    image_size,
-                                   true)) {
+                                   true))
+            {
                 yError() << "Could not open video writer!!";
                 return false;
             }
@@ -225,17 +285,21 @@ public:
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", image_size);
 
-        
         // set-up ROS interface
-        ros_node = new yarp::os::Node("/APRIL");
-        if(!ros_publisher.topic(getName("/output2ros"))) {
-            yError() << "Could not open ROS output publisher";
-            return false;
+        if (ros)
+        {
+            ros_node = new yarp::os::Node("/APRIL");
+            if (!ros_publisher.topic(getName("/output2ros")))
+            {
+                yError() << "Could not open ROS output publisher";
+                return false;
+            }
+            else
+                yInfo() << "ROS output publisher: OK";
         }
-        else 
-            yInfo() << "ROS output publisher: OK";
 
-        asynch_thread = std::thread([this]{ this->run_opixels(); });
+        asynch_thread = std::thread([this]
+                                    { this->run_opixels(); });
 
         return true;
     }
@@ -278,32 +342,33 @@ public:
     {
         static cv::Mat canvas = cv::Mat(image_size, CV_8UC3);
         canvas.setTo(cv::Vec3b(0, 0, 0));
-        
-        //plot the image
-        //check if we plot events or alternative (PIM or EROS)
-        if(alt_view)
+
+        // plot the image
+        // check if we plot events or alternative (PIM or EROS)
+        if (alt_view)
             drawEROS(canvas);
-        else //events
+        else // events
             vis_image.copyTo(canvas);
 
         vis_image.setTo(cv::Vec3b(0, 0, 0));
 
-        //plot skeletons
-        if(pltDet)
+        // plot skeletons
+        if (pltDet)
             hpecore::drawSkeleton(canvas, skeleton_detection, {255, 0, 0}, 3);
 
         hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
 
-        if(pltVel) 
+        if (pltVel)
         {
             hpecore::skeleton13_vel jv = state.queryVelocity();
-            for (int j = 0; j < 13; j++)  // (F) overload * to skeleton13
+            for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
                 jv[j] = jv[j] * 0.1;
 
             hpecore::drawVel(canvas, state.query(), jv, {255, 255, 102}, 2);
         }
 
-        if (!edpr_logo.empty()) {
+        if (!edpr_logo.empty())
+        {
             static cv::Mat mask;
             cv::cvtColor(edpr_logo, mask, CV_BGR2GRAY);
             edpr_logo.copyTo(canvas, mask);
@@ -314,19 +379,22 @@ public:
 
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
-        if(key_pressed > 0)
+        if (key_pressed > 0)
         {
-            switch(key_pressed)
+            switch (key_pressed)
             {
-                case 'v':
-                    pltVel = !pltVel; break;
-                case 'd':
-                    pltDet = !pltDet; break;
-                case 'e':
-                    alt_view = !alt_view; break;
-                case '\e':
-                    stopModule(); break;
-
+            case 'v':
+                pltVel = !pltVel;
+                break;
+            case 'd':
+                pltDet = !pltDet;
+                break;
+            case 'e':
+                alt_view = !alt_view;
+                break;
+            case '\e':
+                stopModule();
+                break;
             }
         }
         return true;
@@ -341,7 +409,8 @@ public:
         hpecore::stampedPose detected_pose;
         input_events.readPacket(true);
         double t0 = Time::now();
-        std:vector<double> sklt_out, vel_out;
+    std:
+        vector<double> sklt_out, vel_out;
 
         while (!isStopping())
         {
@@ -349,13 +418,19 @@ public:
 
             // ---------- DETECTIONS ----------
             bool was_detected = false;
-            if (movenet) {
+            if (use_gt)
+            {
+                was_detected = gt_handler.update(tnow, detected_pose);
+            }
+            else if (movenet)
+            {
                 static cv::Mat eros8;
                 pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
                 was_detected = mn_handler.update(eros8, tnow, detected_pose);
             }
 
-            if (was_detected && hpecore::poseNonZero(detected_pose.pose)) {
+            if (was_detected && hpecore::poseNonZero(detected_pose.pose))
+            {
                 skeleton_detection = detected_pose.pose;
                 latency = detected_pose.delay;
                 if (state.poseIsInitialised())
@@ -365,12 +440,12 @@ public:
             }
 
             // ---------- VELOCITY ----------
-            //read events
+            // read events
             event_stats = input_events.readAll(false);
-            if(event_stats.count == 0)
+            if (event_stats.count == 0)
                 continue;
 
-            //update images
+            // update images
             for (auto &v : input_events)
             {
                 if (v.p)
@@ -378,18 +453,18 @@ public:
                 else
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
-            
+
             pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
 
-            //only update velocity if the pose is initialised
-            if(!state.poseIsInitialised())
+            // only update velocity if the pose is initialised
+            if (!state.poseIsInitialised())
                 continue;
 
             skel_vel = pw_velocity.query(state.query(), roiSize, 2, state.queryVelocity());
 
-            //this scaler was thought to be from timestamp misconversion.
-            //instead we aren't sure why it is needed.
-            for (int j = 0; j < 13; j++)  // (F) overload * to skeleton13
+            // this scaler was thought to be from timestamp misconversion.
+            // instead we aren't sure why it is needed.
+            for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
                 skel_vel[j] = skel_vel[j] * scaler;
 
             state.setVelocity(skel_vel);
@@ -398,22 +473,25 @@ public:
             skelwriter.write({event_stats.timestamp, latency, state.query()});
             velwriter.write({event_stats.timestamp, latency, skel_vel});
 
-            // format skeleton to ros output
-            sklt_out.clear();
-            vel_out.clear();
-            for (int j = 0; j < 13; j++)
+            if (ros)
             {
-                sklt_out.push_back(skeleton_detection[j].u);
-                sklt_out.push_back(skeleton_detection[j].v);
-                vel_out.push_back(skel_vel[j].u);
-                vel_out.push_back(skel_vel[j].v);
+                // format skeleton to ros output
+                sklt_out.clear();
+                vel_out.clear();
+                for (int j = 0; j < 13; j++)
+                {
+                    sklt_out.push_back(skeleton_detection[j].u);
+                    sklt_out.push_back(skeleton_detection[j].v);
+                    vel_out.push_back(skel_vel[j].u);
+                    vel_out.push_back(skel_vel[j].v);
+                }
+                ros_output.timestamp = tnow;
+                ros_output.pose = sklt_out;
+                ros_output.velocity = vel_out;
+                // publish data
+                ros_publisher.prepare() = ros_output;
+                ros_publisher.write();
             }
-            ros_output.timestamp = tnow;
-            ros_output.pose = sklt_out;
-            ros_output.velocity = vel_out;
-            // publish data
-            ros_publisher.prepare() = ros_output;
-            ros_publisher.write();
         }
     }
 };
