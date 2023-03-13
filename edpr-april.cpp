@@ -107,7 +107,7 @@ private:
     bool movenet{false};
     int detF{10}, roiSize{20};
     double scaler{12.5};
-    bool alt_view{false}, pltVel{false}, pltDet{false};
+    bool alt_view{false}, pltVel{false}, pltDet{false}, gpu{false};
     bool latency_compensation{true};
     double th_period{0.01};
 
@@ -139,13 +139,14 @@ public:
         movenet = true;
 
         alt_view = rf.check("alt_view") && rf.check("alt_view", Value(true)).asBool();
+        gpu = rf.check("gpu") && rf.check("gpu", Value(true)).asBool();
         detF = rf.check("detF", Value(10)).asInt32();
 
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
         roiSize = rf.check("roi", Value(20)).asInt32();
 
-        double procU = rf.check("pu", Value(1e-3)).asFloat64();
+        double procU = rf.check("pu", Value(1e-1)).asFloat64();
         double measUD = rf.check("muD", Value(1e-4)).asFloat64();
         double measUV = rf.check("muV", Value(0)).asFloat64();
         latency_compensation = rf.check("use_lc") && rf.check("use_lc", Value(true)).asBool();
@@ -155,7 +156,10 @@ public:
         // ===== SET UP DETECTOR METHOD =====
         if (movenet) {
             // run python code for movenet
-            int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py &");
+            if(gpu)
+                int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py --gpu &");
+            else
+                int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py &");
             while (!yarp::os::NetworkBase::exists("/movenet/sklt:o"))
                 sleep(1);
             yInfo() << "MoveEnet started correctly";
@@ -215,8 +219,11 @@ public:
         Network::connect("/zynqGrabber/AE:o", getName("/AE:i"), "fast_tcp");
         Network::connect(getName("/eros:o"), "/movenet/img:i", "fast_tcp");
 
+        // * DPH19
+        Network::connect("/file/ch3dvs:o", getName("/AE:i"), "fast_tcp");
+
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
-        cv::resizeWindow("edpr-april", cv::Size(640, 480));
+        cv::resizeWindow("edpr-april", image_size);
 
         
         // set-up ROS interface
@@ -372,13 +379,13 @@ public:
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
             
-            pw_velocity.update(input_events.begin(), input_events.end(), tnow);
+            pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
 
             //only update velocity if the pose is initialised
             if(!state.poseIsInitialised())
                 continue;
 
-            skel_vel = pw_velocity.query(state.query(), 20, 2, state.queryVelocity());
+            skel_vel = pw_velocity.query(state.query(), roiSize, 2, state.queryVelocity());
 
             //this scaler was thought to be from timestamp misconversion.
             //instead we aren't sure why it is needed.
@@ -386,10 +393,10 @@ public:
                 skel_vel[j] = skel_vel[j] * scaler;
 
             state.setVelocity(skel_vel);
-            state.updateFromVelocity(skel_vel, tnow);
+            state.updateFromVelocity(skel_vel, event_stats.timestamp);
 
-            skelwriter.write({tnow, latency, state.query()});
-            velwriter.write({tnow, latency, skel_vel});
+            skelwriter.write({event_stats.timestamp, latency, state.query()});
+            velwriter.write({event_stats.timestamp, latency, skel_vel});
 
             // format skeleton to ros output
             sklt_out.clear();
