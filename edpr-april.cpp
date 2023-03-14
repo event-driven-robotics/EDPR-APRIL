@@ -107,6 +107,7 @@ public:
             // grab the new skeleton and set the timestamp to now
             internal.pose = hpecore::extractSkeletonFromYARP<Bottle>(*gt_container);
             internal.timestamp = latest_ts;
+            fixSKLT();
 
             // if we don't delay set the current result to be returned
             if (!delay)
@@ -117,6 +118,17 @@ public:
             return true;
         }
         return false;
+    }
+
+    void fixSKLT()
+    {
+        double aux;
+        for (int i=0; i<13 ; i++)
+        {
+            aux = internal.pose[i].u;
+            internal.pose[i].u = internal.pose[i].v;
+            internal.pose[i].v = aux;
+        }
     }
 };
 
@@ -281,6 +293,7 @@ public:
 
         // * DPH19
         Network::connect("/file/ch3dvs:o", getName("/AE:i"), "fast_tcp");
+        Network::connect("/file/ch3GTskeleton:o", getName("/gt:i"), "fast_tcp");
 
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", image_size);
