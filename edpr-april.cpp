@@ -107,7 +107,6 @@ public:
             // grab the new skeleton and set the timestamp to now
             internal.pose = hpecore::extractSkeletonFromYARP<Bottle>(*gt_container);
             internal.timestamp = latest_ts;
-            fixSKLT();
 
             // if we don't delay set the current result to be returned
             if (!delay)
@@ -119,20 +118,9 @@ public:
         }
         return false;
     }
-
-    void fixSKLT()
-    {
-        double aux;
-        for (int i=0; i<13 ; i++)
-        {
-            aux = internal.pose[i].u;
-            internal.pose[i].u = internal.pose[i].v;
-            internal.pose[i].v = aux;
-        }
-    }
 };
 
-class isaacHPE : public RFModule
+class aprilHPE : public RFModule
 {
 
 private:
@@ -146,7 +134,10 @@ private:
 
     // velocity and fusion
     hpecore::pwvelocity pw_velocity;
-    hpecore::multiJointLatComp state;
+    hpecore::surfacedVelocity sf_velocity;
+    hpecore::queuedVelocity q_velocity;
+    // hpecore::multiJointLatComp state;
+    hpecore::stateEstimator state;
 
     // internal data structures
     hpecore::skeleton13 skeleton_gt{0};
@@ -164,9 +155,11 @@ private:
     bool movenet{false}, use_gt{false};
     int detF{10}, roiSize{20};
     double scaler{12.5};
-    bool alt_view{false}, pltVel{false}, pltDet{false}, gpu{false}, ros{false};
+    bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false};
+    bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false};
     bool latency_compensation{true}, delay{false};
     double th_period{0.01};
+    bool dhp19{false};
 
     // ros
     yarp::os::Node *ros_node{nullptr};
@@ -197,20 +190,60 @@ public:
         use_gt = !movenet ? true : false;
         delay = rf.check("delay") && rf.check("delay", Value(true)).asBool();
         alt_view = rf.check("alt_view") && rf.check("alt_view", Value(true)).asBool();
+        pltDet = rf.check("pltDet") && rf.check("pltDet", Value(true)).asBool();
+        pltTra = rf.check("pltTra") && rf.check("pltTra", Value(true)).asBool();
         gpu = rf.check("gpu") && rf.check("gpu", Value(true)).asBool();
         ros = rf.check("ros") && rf.check("ros", Value(true)).asBool();
         detF = rf.check("detF", Value(10)).asInt32();
-
+        dhp19 = rf.check("dhp19") && rf.check("dhp19", Value(true)).asBool();
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
         roiSize = rf.check("roi", Value(20)).asInt32();
-
-        double procU = rf.check("pu", Value(1e-1)).asFloat64();
-        double measUD = rf.check("muD", Value(1e-4)).asFloat64();
+        double procU = rf.check("pu", Value(1e-3)).asFloat64();
+        double measUD = rf.check("muD", Value(1e-3)).asFloat64();
         double measUV = rf.check("muV", Value(0)).asFloat64();
         latency_compensation = rf.check("use_lc") && rf.check("use_lc", Value(true)).asBool();
         double lc = latency_compensation ? 1.0 : 0.0;
         scaler = rf.check("sc", Value(12.5)).asFloat64();
+
+        pltDet = true;
+        pltTra = true;
+
+        // ===== SELECT VELOCITY ESTIMATION METHOD =====
+        std::string method = rf.check("ve", Value("")).asString();
+        if(!method.compare("px"))
+        {
+            vpx = true;
+            yInfo() << "Velocity estimation method = Pixel-wise";
+        }
+        else if(!method.compare("surf"))
+        {
+            vsf = true;
+            yInfo() << "Velocity estimation method = Past surfaces";
+        }
+        else if(!method.compare("err"))
+        {
+            ver = true;
+            yInfo() << "Velocity estimation method = Error to previous velocity";
+        }
+        else if(!method.compare("circle"))
+        {
+            vcr = true;
+            yInfo() << "Velocity estimation method = Error to observation circle";
+        }    
+        else if(!method.compare("q"))
+        {
+            vqu = true;
+            yInfo() << "Velocity estimation method = Queues of events";
+        }
+        if(!method.length()) yInfo() << "Velocity estimation method = NONE";
+
+        if(dhp19)
+        {
+            image_size = cv::Size(346, 260);
+            // scaler = 1;
+            roiSize = 12;
+        }
 
         // ===== SET UP DETECTOR METHOD =====
         if (use_gt)
@@ -247,6 +280,8 @@ public:
 
         // velocity estimation
         pw_velocity.setParameters(image_size, 7, 0.3, 0.01);
+        sf_velocity.setParameters(roiSize, 2, 8, 1000, image_size);
+        q_velocity.setParameters(roiSize, 2, 8, 1000);
 
         // fusion
         if (!state.initialise({procU, measUD, measUV, lc}))
@@ -302,7 +337,7 @@ public:
         if (ros)
         {
             ros_node = new yarp::os::Node("/APRIL");
-            if (!ros_publisher.topic(getName("/output2ros")))
+            if (!ros_publisher.topic("/isim/neuromorphic_camera/data"))
             {
                 yError() << "Could not open ROS output publisher";
                 return false;
@@ -368,8 +403,8 @@ public:
         // plot skeletons
         if (pltDet)
             hpecore::drawSkeleton(canvas, skeleton_detection, {255, 0, 0}, 3);
-
-        hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
+        if (pltTra)
+            hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
 
         if (pltVel)
         {
@@ -404,6 +439,9 @@ public:
                 break;
             case 'e':
                 alt_view = !alt_view;
+                break;
+            case 't':
+                pltTra = !pltTra;
                 break;
             case '\e':
                 stopModule();
@@ -467,21 +505,31 @@ public:
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
 
-            pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
+            if(vpx) pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
+            
 
             // only update velocity if the pose is initialised
             if (!state.poseIsInitialised())
                 continue;
 
-            skel_vel = pw_velocity.query(state.query(), roiSize, 2, state.queryVelocity());
-
+            if(vpx) skel_vel = pw_velocity.query(state.query(), roiSize, 2, state.queryVelocity());
+            if(vsf) skel_vel = sf_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
+            if(ver)
+            {
+                sf_velocity.errorToVel(input_events.begin(), input_events.end(), state.query(), state.queryVelocity(), state.queryError(), event_stats.timestamp);
+                skel_vel = sf_velocity.updateOnError(state.queryVelocity(), state.queryError());
+            }
+            if(vqu)
+                skel_vel = q_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
+                
             // this scaler was thought to be from timestamp misconversion.
             // instead we aren't sure why it is needed.
             for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
                 skel_vel[j] = skel_vel[j] * scaler;
 
             state.setVelocity(skel_vel);
-            state.updateFromVelocity(skel_vel, event_stats.timestamp);
+            // state.updateFromVelocity(skel_vel, event_stats.timestamp);
+            state.updateFromVelocity(skel_vel, tnow);
 
             skelwriter.write({event_stats.timestamp, latency, state.query()});
             velwriter.write({event_stats.timestamp, latency, skel_vel});
@@ -517,6 +565,6 @@ int main(int argc, char *argv[])
     rf.configure(argc, argv);
 
     /* create the module */
-    isaacHPE instance;
+    aprilHPE instance;
     return instance.runModule(rf);
 }
