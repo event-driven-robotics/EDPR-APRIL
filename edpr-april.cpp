@@ -221,7 +221,7 @@ public:
         
         // set-up ROS interface
         ros_node = new yarp::os::Node("/APRIL");
-        if(!ros_publisher.topic(getName("/isim/neuromorphic_camera/data"))) {
+        if(!ros_publisher.topic("/isim/neuromorphic_camera/data")) {
             yError() << "Could not open ROS output publisher";
             return false;
         }
