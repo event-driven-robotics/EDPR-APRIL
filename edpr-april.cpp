@@ -136,8 +136,8 @@ private:
     hpecore::pwvelocity pw_velocity;
     hpecore::surfacedVelocity sf_velocity;
     hpecore::queuedVelocity q_velocity;
-    // hpecore::multiJointLatComp state;
-    hpecore::stateEstimator state;
+    hpecore::multiJointLatComp state;
+    // hpecore::stateEstimator state;
 
     // internal data structures
     hpecore::skeleton13 skeleton_gt{0};
@@ -160,6 +160,11 @@ private:
     bool latency_compensation{true}, delay{false};
     double th_period{0.01};
     bool dhp19{false};
+    bool pltRoi{false};
+    cv::Scalar colors[13] = {{0, 0, 180}, {0, 180, 0}, {0, 0, 180},
+                            {180, 180, 0}, {180, 0, 180}, {0, 180, 180},
+                            {120, 0, 180}, {120, 180, 0}, {0, 120, 180},
+                            {120, 120, 180}, {120, 180, 120}, {120, 120, 180}, {120, 120, 120}};
 
     // ros
     yarp::os::Node *ros_node{nullptr};
@@ -192,6 +197,7 @@ public:
         alt_view = rf.check("alt_view") && rf.check("alt_view", Value(true)).asBool();
         pltDet = rf.check("pltDet") && rf.check("pltDet", Value(true)).asBool();
         pltTra = rf.check("pltTra") && rf.check("pltTra", Value(true)).asBool();
+        pltRoi = rf.check("pr") && rf.check("pr", Value(true)).asBool();
         gpu = rf.check("gpu") && rf.check("gpu", Value(true)).asBool();
         ros = rf.check("ros") && rf.check("ros", Value(true)).asBool();
         detF = rf.check("detF", Value(10)).asInt32();
@@ -199,8 +205,8 @@ public:
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
         roiSize = rf.check("roi", Value(20)).asInt32();
-        double procU = rf.check("pu", Value(1e-3)).asFloat64();
-        double measUD = rf.check("muD", Value(1e-3)).asFloat64();
+        double procU = rf.check("pu", Value(1e-1)).asFloat64();
+        double measUD = rf.check("muD", Value(1e-4)).asFloat64();
         double measUV = rf.check("muV", Value(0)).asFloat64();
         latency_compensation = rf.check("use_lc") && rf.check("use_lc", Value(true)).asBool();
         double lc = latency_compensation ? 1.0 : 0.0;
@@ -219,21 +225,25 @@ public:
         else if(!method.compare("surf"))
         {
             vsf = true;
+            scaler = 2;
             yInfo() << "Velocity estimation method = Past surfaces";
         }
         else if(!method.compare("err"))
         {
             ver = true;
+            scaler = 2;
             yInfo() << "Velocity estimation method = Error to previous velocity";
         }
         else if(!method.compare("circle"))
         {
             vcr = true;
+            scaler = 1;
             yInfo() << "Velocity estimation method = Error to observation circle";
         }    
         else if(!method.compare("q"))
         {
             vqu = true;
+            scaler = 30;
             yInfo() << "Velocity estimation method = Queues of events";
         }
         if(!method.length()) yInfo() << "Velocity estimation method = NONE";
@@ -241,7 +251,6 @@ public:
         if(dhp19)
         {
             image_size = cv::Size(346, 260);
-            // scaler = 1;
             roiSize = 12;
         }
 
@@ -380,10 +389,25 @@ public:
     void drawEROS(cv::Mat img)
     {
         cv::Mat eros8;
-        pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         cv::cvtColor(eros8, img, cv::COLOR_GRAY2BGR);
         cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
     }
+
+    void drawROI(cv::Mat img)
+    {
+        for(int i=0; i<13 ; i++)
+        {
+            float cx = state.query()[i].u;
+            float cy = state.query()[i].v;
+            cv::Point2d p1(cx-roiSize/2, cy-roiSize/2);
+            cv::Point2d p2(cx+roiSize/2, cy+roiSize/2);
+            cv::rectangle(img, cv::Rect(p1, p2), colors[i], 1);
+            
+        }
+    }
+
 
     // synchronous thread
     bool updateModule() override
@@ -397,6 +421,8 @@ public:
             drawEROS(canvas);
         else // events
             vis_image.copyTo(canvas);
+        if(pltRoi)
+            drawROI(canvas);
 
         vis_image.setTo(cv::Vec3b(0, 0, 0));
 
@@ -425,6 +451,18 @@ public:
         if (output_video.isOpened())
             output_video << canvas;
 
+        std::stringstream ss;
+        ss << std::fixed << std::setprecision(1) << scaler;
+        std::string mystring = ss.str();
+
+        cv::putText(canvas, //target image
+            mystring, //text
+            cv::Point(canvas.cols - 60, canvas.rows - 30), //top-left position
+            cv::FONT_HERSHEY_DUPLEX,
+            0.6,
+            CV_RGB(150, 150, 150), //font color
+            2);
+
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
         if (key_pressed > 0)
@@ -442,6 +480,29 @@ public:
                 break;
             case 't':
                 pltTra = !pltTra;
+                break;
+            case 'r':
+                pltRoi = !pltRoi;
+                break;
+            case ',':
+                if(roiSize>0)
+                    roiSize--;
+                sf_velocity.setParameters(roiSize, 2, 8, 1000, image_size);
+                q_velocity.setParameters(roiSize, 2, 8, 1000);
+                break;
+            case '.':
+                if(roiSize<image_size.height/2)
+                    roiSize++;
+                sf_velocity.setParameters(roiSize, 2, 8, 1000, image_size);
+                q_velocity.setParameters(roiSize, 2, 8, 1000);
+                break;
+            case '[':
+                if(scaler>0)
+                    scaler-=0.5;
+                break;
+            case ']':
+                if(scaler<30)
+                    scaler+=0.5;
                 break;
             case '\e':
                 stopModule();
@@ -513,14 +574,21 @@ public:
                 continue;
 
             if(vpx) skel_vel = pw_velocity.query(state.query(), roiSize, 2, state.queryVelocity());
-            if(vsf) skel_vel = sf_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
+            if(vsf) skel_vel = sf_velocity.update(input_events.begin(), input_events.end(), state.query(), tnow);
             if(ver)
             {
-                sf_velocity.errorToVel(input_events.begin(), input_events.end(), state.query(), state.queryVelocity(), state.queryError(), event_stats.timestamp);
+                sf_velocity.errorToVel(input_events.begin(), input_events.end(), state.query(), state.queryVelocity(), state.queryError(), tnow);
+                skel_vel = sf_velocity.updateOnError(state.queryVelocity(), state.queryError());
+            }
+            if(vcr)
+            {
+                sf_velocity.errorToCircle(input_events.begin(), input_events.end(), state.query(), state.queryVelocity(), state.queryError(), tnow);
                 skel_vel = sf_velocity.updateOnError(state.queryVelocity(), state.queryError());
             }
             if(vqu)
+            {
                 skel_vel = q_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
+            }
                 
             // this scaler was thought to be from timestamp misconversion.
             // instead we aren't sure why it is needed.
@@ -528,8 +596,8 @@ public:
                 skel_vel[j] = skel_vel[j] * scaler;
 
             state.setVelocity(skel_vel);
-            // state.updateFromVelocity(skel_vel, event_stats.timestamp);
-            state.updateFromVelocity(skel_vel, tnow);
+            if(vpx) state.updateFromVelocity(skel_vel, event_stats.timestamp);
+            else state.updateFromVelocity(skel_vel, tnow);
 
             skelwriter.write({event_stats.timestamp, latency, state.query()});
             velwriter.write({event_stats.timestamp, latency, skel_vel});
