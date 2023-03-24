@@ -15,4 +15,15 @@ target_link_libraries(${PROJECT_NAME} YARP::YARP_OS
                                       YARP::YARP_cv
                                       ev::event-driven
                                       hpe-core::hpe-core)
-install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+
+#render single
+add_executable(velocity_grid velocity_grid.cpp)
+target_link_libraries(velocity_grid YARP::YARP_OS 
+                                      YARP::YARP_sig
+                                      YARP::YARP_cv
+                                      ev::event-driven
+                                      hpe-core::hpe-core)
+
+
+install(TARGETS ${PROJECT_NAME} velocity_grid DESTINATION ${CMAKE_INSTALL_BINDIR})
