@@ -136,6 +136,7 @@ private:
     hpecore::pwvelocity pw_velocity;
     hpecore::surfacedVelocity sf_velocity;
     hpecore::queuedVelocity q_velocity;
+    hpecore::tripletVelocity trip_velocity;
     hpecore::multiJointLatComp state;
     // hpecore::stateEstimator state;
 
@@ -156,7 +157,7 @@ private:
     int detF{10}, roiSize{20};
     double scaler{12.5};
     bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false};
-    bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false};
+    bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false};
     bool latency_compensation{true}, delay{false};
     double th_period{0.01};
     bool dhp19{false};
@@ -246,6 +247,12 @@ public:
             scaler = 30;
             yInfo() << "Velocity estimation method = Queues of events";
         }
+        else if(!method.compare("trip"))
+        {
+            vtr = true;
+            scaler = 1;
+            yInfo() << "Velocity estimation method = Triplet";
+        }
         if(!method.length()) yInfo() << "Velocity estimation method = NONE";
 
         if(dhp19)
@@ -291,6 +298,7 @@ public:
         pw_velocity.setParameters(image_size, 7, 0.3, 0.01);
         sf_velocity.setParameters(roiSize, 2, 8, 1000, image_size);
         q_velocity.setParameters(roiSize, 2, 8, 1000);
+        trip_velocity.setParameters(roiSize, 1, image_size);
 
         // fusion
         if (!state.initialise({procU, measUD, measUV, lc}))
@@ -589,12 +597,11 @@ public:
             {
                 skel_vel = q_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
             }
-                
+            if(vtr) skel_vel = trip_velocity.update(input_events.begin(), input_events.end(), state.query(), tnow);
             // this scaler was thought to be from timestamp misconversion.
             // instead we aren't sure why it is needed.
             for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
                 skel_vel[j] = skel_vel[j] * scaler;
-
             state.setVelocity(skel_vel);
             if(vpx) state.updateFromVelocity(skel_vel, event_stats.timestamp);
             else state.updateFromVelocity(skel_vel, tnow);
