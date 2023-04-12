@@ -12,8 +12,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
-#include "yarp/rosmsg/Vjxoutput.h"
-#include <iomanip>
+#include "april_msgs/NC_humanPose.h"
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -76,7 +75,7 @@ public:
 };
 
 
-class isaacHPE : public RFModule
+class APRIL_HPE : public RFModule
 {
 
 private:
@@ -115,8 +114,8 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::Vjxoutput> ros_publisher;
-    yarp::rosmsg::Vjxoutput ros_output;
+    yarp::os::Publisher<yarp::rosmsg::NC_humanPose> ros_publisher;
+    yarp::rosmsg::NC_humanPose ros_output;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -171,7 +170,7 @@ public:
 
         //shared images
         vis_image = cv::Mat(image_size, CV_8UC3, cv::Vec3b(0, 0, 0));
-        edpr_logo = cv::imread("/usr/local/src/wp5-hpe/edpr_logo.png");
+        edpr_logo = cv::imread("/usr/local/src/EDPR-APRIL/edpr_logo.png");
         
         //velocity estimation
         pw_velocity.setParameters(image_size, 7, 0.3, 0.01);
@@ -223,7 +222,7 @@ public:
         
         // set-up ROS interface
         ros_node = new yarp::os::Node("/APRIL");
-        if(!ros_publisher.topic(getName("/output2ros"))) {
+        if(!ros_publisher.topic("/isim/neuromorphic_camera/data")) {
             yError() << "Could not open ROS output publisher";
             return false;
         }
@@ -405,10 +404,10 @@ public:
                 skel_vel[j] = skel_vel[j] * scaler;
 
             state.setVelocity(skel_vel);
-            state.updateFromVelocity(skel_vel, tnow);
+            state.updateFromVelocity(skel_vel, event_stats.timestamp);
 
-            skelwriter.write({tnow, latency, state.query()});
-            velwriter.write({tnow, latency, skel_vel});
+            skelwriter.write({event_stats.timestamp, latency, state.query()});
+            velwriter.write({event_stats.timestamp, latency, skel_vel});
 
             // format skeleton to ros output
             sklt_out.clear();
@@ -420,7 +419,7 @@ public:
                 vel_out.push_back(skel_vel[j].u);
                 vel_out.push_back(skel_vel[j].v);
             }
-            ros_output.timestamp = tnow;
+            ros_output.timestamp = event_stats.timestamp;
             ros_output.pose = sklt_out;
             ros_output.velocity = vel_out;
             // publish data
@@ -438,6 +437,6 @@ int main(int argc, char *argv[])
     rf.configure(argc, argv);
 
     /* create the module */
-    isaacHPE instance;
+    APRIL_HPE instance;
     return instance.runModule(rf);
 }
