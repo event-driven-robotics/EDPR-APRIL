@@ -13,6 +13,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <vector>
 #include <string>
 #include "yarp/rosmsg/Vjxoutput.h"
+#include <iomanip>
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -82,6 +83,7 @@ private:
 
     //event reading
     std::thread asynch_thread;
+    std::thread asynch_thread_detection;
     ev::window<ev::AE> input_events;
 
     //detection handlers
@@ -228,7 +230,9 @@ public:
         else 
             yInfo() << "ROS output publisher: OK";
 
+
         asynch_thread = std::thread([this]{ this->run_opixels(); });
+        asynch_thread_detection = std::thread([this]{ this->run_detection(); });
 
         return true;
     }
@@ -249,6 +253,7 @@ public:
         velwriter.close();
         output_video.release();
         asynch_thread.join();
+        asynch_thread_detection.join();
         return true;
     }
 
@@ -325,16 +330,12 @@ public:
         return true;
     }
 
-    void run_opixels()
+    void run_detection()
     {
-        hpecore::skeleton13_vel jv;
-        hpecore::skeleton13_vel skel_vel = {0};
-        ev::info event_stats = {0};
         double latency = 0.0;
         hpecore::stampedPose detected_pose;
-        input_events.readPacket(true);
         double t0 = Time::now();
-        std:vector<double> sklt_out, vel_out;
+        std:vector<double> sklt_out; 
 
         while (!isStopping())
         {
@@ -356,14 +357,32 @@ public:
                 else
                     state.set(skeleton_detection, tnow);
             }
+        }
+    }
+
+    void run_opixels()
+    {
+        hpecore::skeleton13_vel jv;
+        hpecore::skeleton13_vel skel_vel = {0};
+        ev::info event_stats = {0};
+        double latency = 0.0;
+        hpecore::stampedPose detected_pose;
+        input_events.readPacket(true);
+        double t0 = Time::now();
+        std:vector<double> sklt_out, vel_out;
+
+        while (!isStopping())
+        {
+            double tnow = Time::now() - t0;
 
             // ---------- VELOCITY ----------
             //read events
             event_stats = input_events.readAll(false);
+            
             if(event_stats.count == 0)
                 continue;
-
-            //update images
+            
+            // update images
             for (auto &v : input_events)
             {
                 if (v.p)
@@ -372,7 +391,7 @@ public:
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
             
-            pw_velocity.update(input_events.begin(), input_events.end(), tnow);
+            pw_velocity.update(input_events.begin(), input_events.end());
 
             //only update velocity if the pose is initialised
             if(!state.poseIsInitialised())
