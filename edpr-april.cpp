@@ -166,6 +166,7 @@ private:
                             {180, 180, 0}, {180, 0, 180}, {0, 180, 180},
                             {120, 0, 180}, {120, 180, 0}, {0, 120, 180},
                             {120, 120, 180}, {120, 180, 120}, {120, 120, 180}, {120, 120, 120}};
+    bool started{false};
 
     // ros
     yarp::os::Node *ros_node{nullptr};
@@ -213,7 +214,7 @@ public:
         double lc = latency_compensation ? 1.0 : 0.0;
         scaler = rf.check("sc", Value(12.5)).asFloat64();
 
-        pltDet = true;
+        // pltDet = true;
         pltTra = true;
 
         // ===== SELECT VELOCITY ESTIMATION METHOD =====
@@ -326,7 +327,7 @@ public:
             std::string videopath = rf.find("v").asString();
             if (!output_video.open(videopath,
                                    cv::VideoWriter::fourcc('H', '2', '6', '4'),
-                                   (int)(0.1 / th_period),
+                                   (int)(1 / th_period),
                                    image_size,
                                    true))
             {
@@ -349,6 +350,13 @@ public:
 
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", image_size);
+
+        // cv::namedWindow("SAE-positive", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("SAE-positive", image_size);
+
+        // cv::namedWindow("SAE-negative", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("SAE-negative", image_size);
+
 
         // set-up ROS interface
         if (ros)
@@ -399,8 +407,34 @@ public:
         cv::Mat eros8;
         if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        if(vsf || ver || vcr) sf_velocity.queryEROS().copyTo(eros8);
         cv::cvtColor(eros8, img, cv::COLOR_GRAY2BGR);
         cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
+    }
+
+    // void drawSAE(cv::Mat img)
+    void drawSAE()
+    {
+        // cv::Mat sae = cv::Mat::zeros(image_size, CV_64F);
+        // if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        // if(vpx) pw_velocity.queryEROS().copyTo(eros8);
+        // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        // sf_velocity.querySAE().convertTo(sae, CV_8U, 255);
+        // cv::Mat aux;
+        // trip_velocity.querySAEN();
+        // aux +=200;
+        // aux.copyTo(img);
+        // cv::normalize(aux,img, 0, 255, cv::NORM_MINMAX);
+        // saesf_velocity.querySAE().copyTo(sae);
+        // cv::Mat Temp;
+        // sae.convertTo(Temp, CV_8U);
+        // cv::Mat Result;
+        // cv::cvtColor(sae, img, CV_BGRA2BGR);
+        // cv::cvtColor(sae, img, cv::COLOR_GRAY2BGRA);
+        // cv::cvtColor(Temp, img, cv::COLOR_GRAY2BGR);
+        // cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
+        cv::imshow("SAE-positive", trip_velocity.querySAEP());
+        cv::imshow("SAE-negative", trip_velocity.querySAEN());
     }
 
     void drawROI(cv::Mat img)
@@ -423,10 +457,12 @@ public:
         static cv::Mat canvas = cv::Mat(image_size, CV_8UC3);
         canvas.setTo(cv::Vec3b(0, 0, 0));
 
+        // drawSAE();
         // plot the image
         // check if we plot events or alternative (PIM or EROS)
         if (alt_view)
             drawEROS(canvas);
+            // drawSAE(canvas);
         else // events
             vis_image.copyTo(canvas);
         if(pltRoi)
@@ -456,20 +492,20 @@ public:
             edpr_logo.copyTo(canvas, mask);
         }
 
-        if (output_video.isOpened())
+        if (output_video.isOpened() && started)
             output_video << canvas;
 
         std::stringstream ss;
         ss << std::fixed << std::setprecision(1) << scaler;
         std::string mystring = ss.str();
 
-        cv::putText(canvas, //target image
-            mystring, //text
-            cv::Point(canvas.cols - 60, canvas.rows - 30), //top-left position
-            cv::FONT_HERSHEY_DUPLEX,
-            0.6,
-            CV_RGB(150, 150, 150), //font color
-            2);
+        // cv::putText(canvas, //target image
+        //     mystring, //text
+        //     cv::Point(canvas.cols - 60, canvas.rows - 30), //top-left position
+        //     cv::FONT_HERSHEY_DUPLEX,
+        //     0.6,
+        //     CV_RGB(150, 150, 150), //font color
+        //     2);
 
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
@@ -565,6 +601,8 @@ public:
             if (event_stats.count == 0)
                 continue;
 
+            if(!started) started = true;
+
             // update images
             for (auto &v : input_events)
             {
@@ -574,7 +612,7 @@ public:
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
 
-            if(vpx) pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
+            if(vpx || vtr) pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
             
 
             // only update velocity if the pose is initialised
@@ -597,14 +635,14 @@ public:
             {
                 skel_vel = q_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
             }
-            if(vtr) skel_vel = trip_velocity.update(input_events.begin(), input_events.end(), state.query(), tnow);
+            if(vtr) skel_vel = trip_velocity.update(input_events.begin(), input_events.end(), state.query(), event_stats.timestamp);
             // this scaler was thought to be from timestamp misconversion.
             // instead we aren't sure why it is needed.
             for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
                 skel_vel[j] = skel_vel[j] * scaler;
             state.setVelocity(skel_vel);
             if(vpx) state.updateFromVelocity(skel_vel, event_stats.timestamp);
-            else state.updateFromVelocity(skel_vel, tnow);
+            else state.updateFromVelocity(skel_vel, event_stats.timestamp);
 
             skelwriter.write({event_stats.timestamp, latency, state.query()});
             velwriter.write({event_stats.timestamp, latency, skel_vel});

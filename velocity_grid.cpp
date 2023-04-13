@@ -55,7 +55,7 @@ private:
     bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false};
     bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false};
     bool latency_compensation{true}, delay{false};
-    double th_period{0.01};
+    double th_period{0.00005};
     bool dhp19{false};
     bool pltRoi{false};
     bool showGrid{false};
@@ -235,6 +235,9 @@ public:
         // * DPH19
         Network::connect("/file/ch3dvs:o", getName("/AE:i"), "fast_tcp");
         Network::connect("/file/ch3GTskeleton:o", getName("/gt:i"), "fast_tcp");
+        // * Mustard bottle
+        Network::connect("/file/leftdvs:o", getName("/AE:i"), "fast_tcp");
+        
 
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", image_size);
@@ -288,6 +291,7 @@ public:
         if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         // if(vpx) pw_velocity.queryEROS().copyTo(eros8);
         // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        if(vsf || ver || vcr) sf_velocity.querySAE().convertTo(eros8, CV_8U, 255);
         cv::cvtColor(eros8, img, cv::COLOR_GRAY2BGR);
         cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
     }
@@ -334,7 +338,7 @@ public:
         //     std::cout << std::endl;
         // }
         // std::cout << std::endl;
-        hpecore::drawGrid(canvas, grid, rows, cols, {100, 100, 100}, 1, showGrid, delta);
+        hpecore::drawGrid(canvas, grid, rows, cols, {102, 255, 255}, 1, showGrid, delta);
         // int width = canvas.cols/cols;
         // int height = canvas.rows/rows;
         // for(int i=0; i<rows; i++)
@@ -379,17 +383,17 @@ public:
         if (output_video.isOpened())
             output_video << canvas;
 
-        std::stringstream ss;
-        ss << std::fixed << std::setprecision(1) << scaler;
-        std::string mystring = ss.str();
+        // std::stringstream ss;
+        // ss << std::fixed << std::setprecision(1) << scaler;
+        // std::string mystring = ss.str();
 
-        cv::putText(canvas, //target image
-            mystring, //text
-            cv::Point(canvas.cols - 60, canvas.rows - 30), //top-left position
-            cv::FONT_HERSHEY_DUPLEX,
-            0.6,
-            CV_RGB(150, 150, 150), //font color
-            2);
+        // cv::putText(canvas, //target image
+        //     mystring, //text
+        //     cv::Point(canvas.cols - 60, canvas.rows - 30), //top-left position
+        //     cv::FONT_HERSHEY_DUPLEX,
+        //     0.6,
+        //     CV_RGB(150, 150, 150), //font color
+        //     2);
 
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
@@ -411,6 +415,9 @@ public:
                 break;
             case 'r':
                 pltRoi = !pltRoi;
+                break;
+            case 'g':
+                showGrid = !showGrid;
                 break;
             case ',':
                 if(roiSize>0)
@@ -468,16 +475,17 @@ public:
             // update images
             for (auto &v : input_events)
             {
-                if (v.p)
-                    vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(64, 150, 90);
-                else
-                    vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
+                // if (v.p)
+                //     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(64, 150, 90);
+                // else
+                //     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
+                vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(150, 150, 150);
             }
 
             if(vpx) pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
             pw_velocity.update(input_events.begin(), input_events.end(), tnow);
             
-            pw_velocity.query_grid(grid, rows, cols, 2);
+            pw_velocity.query_grid(grid, event_stats.timestamp, rows, cols, 2);
 
             // this scaler was thought to be from timestamp misconversion.
             // instead we aren't sure why it is needed.
