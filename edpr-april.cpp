@@ -12,7 +12,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
-#include "yarp/rosmsg/Vjxoutput.h"
+#include "april_msgs/NC_humanPose.h"
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -120,12 +120,13 @@ public:
     }
 };
 
-class aprilHPE : public RFModule
+class APRIL_HPE : public RFModule
 {
 
 private:
     // event reading
     std::thread asynch_thread;
+    std::thread asynch_thread_detection;
     ev::window<ev::AE> input_events;
 
     // detection handlers
@@ -168,10 +169,10 @@ private:
                             {120, 120, 180}, {120, 180, 120}, {120, 120, 180}, {120, 120, 120}};
     bool started{false};
 
-    // ros
-    yarp::os::Node *ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::Vjxoutput> ros_publisher;
-    yarp::rosmsg::Vjxoutput ros_output;
+    // ros 
+    yarp::os::Node* ros_node{nullptr};
+    yarp::os::Publisher<yarp::rosmsg::NC_humanPose> ros_publisher;
+    yarp::rosmsg::NC_humanPose ros_output;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -293,9 +294,9 @@ public:
 
         // shared images
         vis_image = cv::Mat(image_size, CV_8UC3, cv::Vec3b(0, 0, 0));
-        edpr_logo = cv::imread("/usr/local/src/wp5-hpe/edpr_logo.png");
-
-        // velocity estimation
+        edpr_logo = cv::imread("/usr/local/src/EDPR-APRIL/edpr_logo.png");
+        
+        //velocity estimation
         pw_velocity.setParameters(image_size, 7, 0.3, 0.01);
         sf_velocity.setParameters(roiSize, 2, 8, 1000, image_size);
         q_velocity.setParameters(roiSize, 2, 8, 1000);
@@ -371,8 +372,9 @@ public:
                 yInfo() << "ROS output publisher: OK";
         }
 
-        asynch_thread = std::thread([this]
-                                    { this->run_opixels(); });
+
+        asynch_thread = std::thread([this]{ this->run_opixels(); });
+        asynch_thread_detection = std::thread([this]{ this->run_detection(); });
 
         return true;
     }
@@ -393,6 +395,7 @@ public:
         velwriter.close();
         output_video.release();
         asynch_thread.join();
+        asynch_thread_detection.join();
         return true;
     }
 
@@ -556,17 +559,12 @@ public:
         return true;
     }
 
-    void run_opixels()
+    void run_detection()
     {
-        hpecore::skeleton13_vel jv;
-        hpecore::skeleton13_vel skel_vel = {0};
-        ev::info event_stats = {0};
         double latency = 0.0;
         hpecore::stampedPose detected_pose;
-        input_events.readPacket(true);
         double t0 = Time::now();
-    std:
-        vector<double> sklt_out, vel_out;
+        std:vector<double> sklt_out; 
 
         while (!isStopping())
         {
@@ -594,6 +592,23 @@ public:
                 else
                     state.set(skeleton_detection, tnow);
             }
+        }
+    }
+
+    void run_opixels()
+    {
+        hpecore::skeleton13_vel jv;
+        hpecore::skeleton13_vel skel_vel = {0};
+        ev::info event_stats = {0};
+        double latency = 0.0;
+        hpecore::stampedPose detected_pose;
+        input_events.readPacket(true);
+        double t0 = Time::now();
+        std:vector<double> sklt_out, vel_out;
+
+        while (!isStopping())
+        {
+            double tnow = Time::now() - t0;
 
             // ---------- VELOCITY ----------
             // read events
@@ -612,7 +627,7 @@ public:
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
 
-            if(vpx || vtr) pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
+            if(vpx || vtr) pw_velocity.update(input_events.begin(), input_events.end());
             
 
             // only update velocity if the pose is initialised
@@ -678,6 +693,6 @@ int main(int argc, char *argv[])
     rf.configure(argc, argv);
 
     /* create the module */
-    aprilHPE instance;
+    APRIL_HPE instance;
     return instance.runModule(rf);
 }

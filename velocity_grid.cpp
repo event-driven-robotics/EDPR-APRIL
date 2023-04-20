@@ -12,7 +12,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
-#include "yarp/rosmsg/Vjxoutput.h"
+#include "april_msgs/NC_humanPose.h"
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -64,10 +64,10 @@ private:
                             {120, 0, 180}, {120, 180, 0}, {0, 120, 180},
                             {120, 120, 180}, {120, 180, 120}, {120, 120, 180}, {120, 120, 120}};
 
-    // ros
-    yarp::os::Node *ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::Vjxoutput> ros_publisher;
-    yarp::rosmsg::Vjxoutput ros_output;
+    // ros 
+    yarp::os::Node* ros_node{nullptr};
+    yarp::os::Publisher<yarp::rosmsg::NC_humanPose> ros_publisher;
+    yarp::rosmsg::NC_humanPose ros_output;
     std::vector<hpecore::joint> grid;
     int rows{10}, cols{10};
     double delta;
@@ -482,8 +482,8 @@ public:
                 vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(150, 150, 150);
             }
 
-            if(vpx) pw_velocity.update(input_events.begin(), input_events.end(), event_stats.timestamp);
-            pw_velocity.update(input_events.begin(), input_events.end(), tnow);
+            if(vpx) pw_velocity.update(input_events.begin(), input_events.end());
+            pw_velocity.update(input_events.begin(), input_events.end());
             
             pw_velocity.query_grid(grid, event_stats.timestamp, rows, cols, 2);
 
