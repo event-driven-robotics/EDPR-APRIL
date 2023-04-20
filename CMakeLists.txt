@@ -16,3 +16,6 @@ target_link_libraries(${PROJECT_NAME} YARP::YARP_OS
                                       ev::event-driven
                                       hpe-core::hpe-core)
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+
+add_subdirectory(fault_button/cpp)
