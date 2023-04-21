@@ -44,11 +44,9 @@ def get_events_roi(events, roi):
 
     return ts_filt, window_size
 
-def plot_hist(ax, ts_filt, dataset_tres):
+def plot_hist(ax, ts_filt, dataset_tres, t_start=0.0, t_end=np.inf):
    
     # controll the lenght of the sequence if needed
-    t_start = 0
-    t_end = np.inf
     id_start = np.searchsorted(ts_filt, t_start)
     id_end = np.searchsorted(ts_filt, t_end)
 
@@ -85,3 +83,13 @@ def plot_detections(ax, h, detection_thresh, bins, dataset_tres, yval):
             detected = False
 
     ax.scatter(detection_times, [yval for x in detection_times], marker="x", c="blue", label="Detection time", s=80)
+
+    return detection_times
+
+def measure_time_difference(detection_times, press_timing):
+    differences = []
+    for t in press_timing[:, 0]:
+        idx = np.searchsorted(detection_times, t) - 1
+        differences.append(np.abs(detection_times[idx] - t))
+
+    return differences
