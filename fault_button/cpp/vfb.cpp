@@ -60,9 +60,9 @@ public:
 
         // =====READ PARAMETERS=====
 
-        k = rf.check("k", Value(0.2)).asFloat64();
+        k = rf.check("k", Value(0.05)).asFloat64();
         p = rf.check("p", Value(0.01)).asFloat64();
-        T = rf.check("T", Value(2e6)).asFloat64();
+        T = rf.check("T", Value(2.5e5)).asFloat64();
 
         // ===== TRY DEFAULT CONNECTIONS =====
         Network::connect("/file/ch0dvs:o",  getName("/AE:i"), "fast_tcp");
@@ -152,7 +152,6 @@ public:
         cv::circle(img_display, c_fbr.c, c_fbr.r, {120, 10, 10}, -1);
         cv::circle(img_display, c_fbr.c, c_fbr.r, {255, 0, 0}, 4);
 
-
         cv::imshow(getName(), img_display);
         char c = cv::waitKey(1);
         if(c == '\e')
@@ -169,15 +168,23 @@ public:
 
         ev::info stat = input_events.readSlidingWinT(k);
 
+        int count = 0;
+
         img = 0;
         cv::circle(img, c_fbr.c, c_fbr.r, {50, 50, 50},   -1);
         cv::circle(img, c_fbr.c, c_fbr.r, {120, 120, 120}, 4);
         for(auto &v : input_events) {
-            if(mask.at<char>(v.y, v.x))
+            if(mask.at<char>(v.y, v.x)) {
                 img.at<cv::Vec3b>(v.y, v.x) = {0, 0, 200};
-            else
+                count++;
+            } else {
                 img.at<cv::Vec3b>(v.y, v.x) = {128, 128, 128};
+            }
         }
+
+        if(count > T * k)
+            cv::circle(img, c_fbr.c, c_fbr.r, {0, 0, 255}, 6);
+
         cv::putText(img, "Monitoring Visual Fault Button", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
 
         cv::imshow(getName(), img);
