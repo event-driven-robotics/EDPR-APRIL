@@ -60,9 +60,9 @@ public:
 
         // =====READ PARAMETERS=====
 
-        k = rf.check("k", Value(0.05)).asFloat64();
-        p = rf.check("p", Value(0.01)).asFloat64();
-        T = rf.check("T", Value(2.5e5)).asFloat64();
+        k = rf.check("k", Value(0.001)).asFloat64();
+        p = rf.check("p", Value(0.001)).asFloat64();
+        T = rf.check("T", Value(5e5)).asFloat64();
 
         // ===== TRY DEFAULT CONNECTIONS =====
         Network::connect("/file/ch0dvs:o",  getName("/AE:i"), "fast_tcp");
@@ -124,7 +124,7 @@ public:
     
     void display()
     {
-        ev::info stat = input_events.readSlidingWinT(0.5);
+        ev::info stat = input_events.readSlidingWinT(0.1);
 
         img = 0;
         for(auto &v : input_events)
