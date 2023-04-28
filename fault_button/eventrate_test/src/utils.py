@@ -37,9 +37,8 @@ def get_roi_circle(center, edge, scale=1.0):
     mask = np.zeros((480, 640))
     circle_mask = cv2.circle(mask, center, r, color=(255, 255, 255), thickness=-1)
 
-    window_size = np.pi * np.square(r)
-
-    return circle_mask.astype(bool), window_size
+    window_size = np.count_nonzero(circle_mask)
+    return circle_mask.astype(bool), window_size, r
 
 def get_events_roi(events, roi):
     # select only the events inside the window considered
@@ -47,18 +46,14 @@ def get_events_roi(events, roi):
     events_x = np.array(events['data']['left']['dvs']['x'])
     events_y = np.array(events['data']['left']['dvs']['y'])
 
-    # event_mask = np.zeros(events_x.shape, dtype=bool)
-
-    # for i, (x, y) in enumerate(zip(events_x, events_y)):
-    #     if roi[y, x]:
-    #         event_mask[i] = True
-    # event_mask = [True if roi[y, x] else False for x, y in zip(events_x, events_y)]
-
     event_mask = roi[events_y, events_x]
 
     ts_filt = events['data']['left']['dvs']['ts'][event_mask]
 
-    return ts_filt
+    active_px = np.zeros((480, 640), dtype=int)
+    active_px[events_y[event_mask], events_x[event_mask]] = 1
+
+    return ts_filt, np.count_nonzero(active_px)
 
 def get_hist(ts_filt, dataset_tres, t_start=0.0, t_end=np.inf):
    
@@ -95,20 +90,37 @@ def get_detections(h, detection_thresh, bins, dataset_tres):
 
 def measure_time_difference(detection_times, press_timing):
     differences = []
+    false_detections = 0
+    missed_detections = 0
+    valid_time = 2.0
+    
+    if len(detection_times) == 0:
+            missed_detections = len(press_timing)
+            return differences, false_detections, missed_detections
+    
     for t in press_timing[:, 0]:
+
+        if len(detection_times) == 0:
+            continue
+        
         idx = np.searchsorted(detection_times, t) - 1
-        if len(detection_times) > 0:
-            differences.append(np.abs(detection_times[idx] - t))
-            np.delete(detection_times, idx)
+        diff = t - detection_times[idx]
+
+        if np.abs(diff) > valid_time:
+            missed_detections += 1
+        else:
+            differences.append(diff)
+            detection_times = np.delete(detection_times, idx)
 
     differences = np.array(differences)
-    differences[differences > 2.0] = np.nan
+    differences[np.abs(differences) > valid_time] = np.nan
 
-    return differences
+    false_detections = len(detection_times)
+
+    return differences, false_detections, missed_detections
 
 def get_threshold(base_thresh, tres, window_size, scale):
-    return (base_thresh * tres) * window_size
-
+    return base_thresh * tres * window_size
 
 class Plotter:
 
@@ -156,13 +168,15 @@ class Plotter:
         roi_center = self.roi_center
         roi_edge = self.roi_edge
 
-        fig, axs = plt.subplots(len(scales), 1, figsize=(18, 12))
+        fig, axs = plt.subplots(len(scales), 1, figsize=(18, 12), sharex=True)
 
         for ax, scale in zip(axs, scales):
 
             # scale controlls the radius scale
-            roi, window_size = get_roi_circle(roi_center, roi_edge, scale=scale)
-            ts_filt = get_events_roi(events, roi)
+            roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+            frame_ratio = window_size / (640 * 480)
+            print(f"Roi area: {window_size}px / {640 * 480}, ratio: {frame_ratio}")
+            ts_filt, active_px = get_events_roi(events, roi)
 
             h, bins = get_hist(ts_filt, dataset_tres)
             ax.plot(bins[:-1], h)
@@ -180,7 +194,7 @@ class Plotter:
 
             ax.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
             ax.tick_params(labelsize=14)
-            ax.set_title(f"Roi scale: {scale}", fontsize=14)
+            ax.set_title(f"r: {r}px \t frame ratio: {frame_ratio * 100:.0f}%".expandtabs(), fontsize=14)
 
         fig.suptitle(sequence_name, fontsize=20)
         fig.supxlabel("Time[s]", fontsize=24)
@@ -204,9 +218,9 @@ class Plotter:
         n_detections = []
 
         # scale controlls the radius scale
-        roi, window_size = get_roi_circle(roi_center, roi_edge, scale=scale)
+        roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
 
-        ts_filt = get_events_roi(events, roi)
+        ts_filt, active_px = get_events_roi(events, roi)
 
         for ax, dataset_tres in zip(axs, dataset_tres_ls):
 
@@ -233,10 +247,6 @@ class Plotter:
             ax.tick_params(labelsize=14)
             ax.set_title(f"t_res: {dataset_tres}", fontsize=14)
 
-            differences = measure_time_difference(detection_times, press_timing)
-            mean_differences.append(np.mean(differences))
-            n_detections.append(len(detection_times) - len(press_timing))
-
         fig.suptitle(sequence_name, fontsize=20)
         fig.supxlabel("Time[s]", fontsize=24)
         fig.supylabel("Number of events", fontsize=24)
@@ -254,14 +264,17 @@ class Plotter:
         roi_edge = self.roi_edge
 
         mean_differences = []
-        n_detections = []
+        false_detections = []
+        missed_detections = []
+        frame_ratios = []
 
         for scale in tqdm(scales):
 
             # scale controlls the radius scale
-            roi, window_size = get_roi_circle(roi_center, roi_edge, scale=scale)
-
-            ts_filt = get_events_roi(events, roi)
+            roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+            frame_ratio = window_size / (640 * 480)
+            frame_ratios.append(frame_ratio)
+            ts_filt, active_px = get_events_roi(events, roi)
 
             # measure the event rate
             h, bins = get_hist(ts_filt, dataset_tres, t_start=t_start, t_end=t_end)
@@ -270,30 +283,37 @@ class Plotter:
             detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
             detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
 
-            differences = measure_time_difference(detection_times, press_timing)
-            mean_differences.append(np.mean(differences))
-            n_detections.append(len(detection_times) - len(press_timing))
+            differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
+            mean_differences.append(np.nanmean(differences))
+            false_detections.append(false_detect)
+            missed_detections.append(missed_detect)
 
         self.mean_differences = mean_differences
-        self.n_detections = n_detections
+        self.false_detections = false_detections
+        self.missed_detections = missed_detections
+
+        frame_ratios = np.array(frame_ratios)
 
         fig = plt.figure(figsize=(12, 9))
         
         ax = fig.add_subplot(2, 1, 1)
-        ax.plot(scales * 100, mean_differences, marker="o")
+        ax.plot(frame_ratios * 100, mean_differences, marker="o")
         # ax.set_xticks(scales)
-        ax.set_xlabel("ROI Scale [%]", fontsize=20)
+        ax.set_xlabel("ROI Frame Ratio [%]", fontsize=20)
         ax.set_ylabel("Detection time gain [s]", fontsize=20)
         ax.set_title("Mean time difference", fontsize=22);
 
         ax = fig.add_subplot(2, 1, 2)
-        ax.plot(scales * 100, n_detections, marker="o")
+        ax.plot(frame_ratios * 100, false_detections, marker="o", label="false detections")
+        ax.plot(frame_ratios * 100, missed_detections, marker="o", label="missed detections")
         # ax.set_xticks(scales)
         # ax.set_yticks(n_detections)
-        ax.set_ylim([0, max(n_detections) + 1])
+        ymax = max(max(false_detections), max(missed_detections))
+        ax.set_ylim([-0.5, ymax + 0.5])
         ax.set_xlabel("ROI Scale [%]", fontsize=20)
         # ax.set_ylabel("number of detections", fontsize=20)
-        ax.set_title("False detections", fontsize=22);
+        ax.set_title("Detections", fontsize=22);
+        ax.legend()
 
         plt.tight_layout()
 
@@ -304,13 +324,14 @@ class Plotter:
         roi_center = self.roi_center
         roi_edge = self.roi_edge
 
-        mean_differences = []
-        n_detections = []
+        differences_ls = []
+        false_detections = []
+        missed_detections = []
 
         # scale controlls the radius scale
-        roi, window_size = get_roi_circle(roi_center, roi_edge, scale=scale)
+        roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
 
-        ts_filt = get_events_roi(events, roi)
+        ts_filt, active_px = get_events_roi(events, roi)
 
         for dataset_tres in tqdm(dataset_tres_ls):
 
@@ -321,17 +342,24 @@ class Plotter:
             detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
             detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
 
-            differences = measure_time_difference(detection_times, press_timing)
-            mean_differences.append(np.mean(differences))
-            n_detections.append(len(detection_times) - len(press_timing))
+            differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
+            differences_ls.append(differences)
+            false_detections.append(false_detect)
+            missed_detections.append(missed_detect)
 
-        self.mean_differences = mean_differences
-        self.n_detections = n_detections
+        differences_ls = np.array(differences_ls)
+        mean_time = np.array([np.nanmean(d) for d in differences_ls])
+        std_time  = np.array([np.nanstd(d) for d in differences_ls])
+
+        self.differences_ls = differences_ls
+        self.false_detections = false_detections
+        self.missed_detections = missed_detections
 
         fig = plt.figure(figsize=(12, 9))
         
         ax = fig.add_subplot(2, 1, 1)
-        ax.plot(dataset_tres_ls, mean_differences, marker="o")
+        ax.plot(dataset_tres_ls, mean_time, marker="o")
+        ax.fill_between(dataset_tres_ls, mean_time-std_time, mean_time+std_time, alpha=0.4)
         ax.set_xticks(dataset_tres_ls)
         ax.set_xscale('log')
         ax.set_xlabel("Bins resolution [s]", fontsize=20)
@@ -339,13 +367,184 @@ class Plotter:
         ax.set_title("Mean time difference", fontsize=22);
 
         ax = fig.add_subplot(2, 1, 2)
-        ax.plot(dataset_tres_ls, n_detections, marker="o")
+        ax.plot(dataset_tres_ls, false_detections, marker="o", label="false detections")
+        ax.plot(dataset_tres_ls, missed_detections, marker="o", label="missed detections")
         ax.set_xticks(dataset_tres_ls)
         # ax.set_yticks(n_detections)
-        ax.set_ylim([0, max(n_detections) + 1])
+        ymax = max(max(false_detections), max(missed_detections))
+        ax.set_ylim([-0.5, ymax + 0.5])
         ax.set_xscale('log')
         ax.set_xlabel("Bins resolution [s]", fontsize=20)
         # ax.set_ylabel("number of detections", fontsize=20)
-        ax.set_title("False detections", fontsize=22);
-
+        ax.set_title("Detections", fontsize=22);
+        ax.legend()
         plt.tight_layout()
+
+    def compute_stats_tres(self, base_thresh, scale, dataset_tres_ls):
+        events = self.events
+        press_timing = self.press_timing
+        roi_center = self.roi_center
+        roi_edge = self.roi_edge
+
+        differences_ls = []
+        false_detections = []
+        missed_detections = []
+
+        # scale controlls the radius scale
+        roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+
+        ts_filt, active_px = get_events_roi(events, roi)
+
+        for dataset_tres in tqdm(dataset_tres_ls):
+
+            # measure the event rate
+            h, bins = get_hist(ts_filt, dataset_tres)
+
+            # scale the threshold depending on the time resolution and roi dimension
+            detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
+            detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+
+            differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
+            differences_ls.append(differences)
+            false_detections.append(false_detect)
+            missed_detections.append(missed_detect)
+
+        differences_ls = np.array(differences_ls)
+        mean_times = np.array([np.nanmean(d) for d in differences_ls])
+        std_times  = np.array([np.nanstd(d) for d in differences_ls])
+
+        self.differences_ls = differences_ls
+        self.false_detections = false_detections
+        self.missed_detections = missed_detections
+        self.mean_times = mean_times
+        self.std_times = std_times
+
+        return differences_ls, false_detections, missed_detections
+    
+    def compute_stats_scale(self, base_thresh, scales, dataset_tres):
+        events = self.events
+        press_timing = self.press_timing
+        roi_center = self.roi_center
+        roi_edge = self.roi_edge
+
+        differences_ls = []
+        false_detections = []
+        missed_detections = []
+        frame_ratios = []
+
+        for scale in tqdm(scales):
+
+            # scale controlls the radius scale
+            roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+            frame_ratio = window_size / (640 * 480)
+            frame_ratios.append(frame_ratio)
+            ts_filt, active_px = get_events_roi(events, roi)
+
+            # measure the event rate
+            h, bins = get_hist(ts_filt, dataset_tres)
+
+            # scale the threshold depending on the time resolution and roi dimension
+            detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
+            detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+
+            differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
+            differences_ls.append(differences)
+            false_detections.append(false_detect)
+            missed_detections.append(missed_detect)
+
+        differences_ls = np.array(differences_ls)
+        mean_times = np.array([np.nanmean(d) for d in differences_ls])
+        std_times  = np.array([np.nanstd(d) for d in differences_ls])
+
+        self.differences_ls = differences_ls
+        self.false_detections = false_detections
+        self.missed_detections = missed_detections
+        self.mean_times = mean_times
+        self.std_times = std_times
+
+        return differences_ls, false_detections, missed_detections
+    
+    def compute_stats_thresh(self, base_thresh_ls, scale, dataset_tres):
+        events = self.events
+        press_timing = self.press_timing
+        roi_center = self.roi_center
+        roi_edge = self.roi_edge
+
+        differences_ls = []
+        false_detections = []
+        missed_detections = []
+        frame_ratios = []
+
+        # scale controlls the radius scale
+        roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+        frame_ratio = window_size / (640 * 480)
+        frame_ratios.append(frame_ratio)
+        ts_filt, active_px = get_events_roi(events, roi)
+
+        for base_thresh in tqdm(base_thresh_ls):
+
+            # measure the event rate
+            h, bins = get_hist(ts_filt, dataset_tres)
+
+            # scale the threshold depending on the time resolution and roi dimension
+            detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
+            detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+
+            differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
+            differences_ls.append(differences)
+            false_detections.append(false_detect)
+            missed_detections.append(missed_detect)
+
+        differences_ls = np.array(differences_ls)
+        mean_times = np.array([np.nanmean(d) for d in differences_ls])
+        std_times  = np.array([np.nanstd(d) for d in differences_ls])
+
+        self.differences_ls = differences_ls
+        self.false_detections = false_detections
+        self.missed_detections = missed_detections
+        self.mean_times = mean_times
+        self.std_times = std_times
+
+        return differences_ls, false_detections, missed_detections
+    
+    def plot_hist(self, base_thresh, scale, dataset_tres, sequence_name):
+        
+        events = self.events
+        press_timing = self.press_timing
+        roi_center = self.roi_center
+        roi_edge = self.roi_edge
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        # scale controlls the radius scale
+        roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+        frame_ratio = window_size / (640 * 480)
+        print(f"Roi area: {window_size}px / {640 * 480}, ratio: {frame_ratio}")
+        ts_filt, active_px = get_events_roi(events, roi)
+
+        h, bins = get_hist(ts_filt, dataset_tres)
+        ax.plot(bins[:-1], h)
+        ax.fill_between(bins[:-1], h)
+        # get y val for markers to be on the top of the plot
+        plt_y_lim = ax.get_ylim()
+        v = plt_y_lim[1]
+
+        detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
+        ax.axhline(y=detection_thresh, color='red', label="Detection threshold")
+
+        ax.scatter(press_timing[:, 0], [v for x in press_timing[:, 0]], marker="x", c="green", label="Fault button press", s=80)
+        detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+        ax.scatter(detection_times, [v for x in detection_times], marker="x", c="blue", label="Detection time", s=80)
+
+        ax.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+        ax.tick_params(labelsize=14)
+        ax.set_title(f"r: {r}px \t frame ratio: {frame_ratio * 100:.0f}%".expandtabs(), fontsize=14)
+
+        fig.suptitle(sequence_name, fontsize=20)
+        fig.supxlabel("Time[s]", fontsize=24)
+        fig.supylabel("Number of events", fontsize=24)
+
+        lines, labels = fig.axes[-1].get_legend_handles_labels()
+        plt.figlegend(lines,labels, ncol=3)
+
+        fig.tight_layout()
