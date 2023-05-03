@@ -28,11 +28,14 @@ def get_roi_square(center, edge, scale=1.0):
 
     return square_mask, window_size
 
-def get_roi_circle(center, edge, scale=1.0):
+def get_roi_circle(center, edge, scale=1.0, radius=None):
     r = int(max(
         np.abs(center[0] - edge[0]),
         np.abs(center[1] - edge[1])
     ) * scale)
+
+    if radius is not None:
+        r = int(radius)
 
     mask = np.zeros((480, 640))
     circle_mask = cv2.circle(mask, center, r, color=(255, 255, 255), thickness=-1)
@@ -101,6 +104,7 @@ def measure_time_difference(detection_times, press_timing):
     for t in press_timing[:, 0]:
 
         if len(detection_times) == 0:
+            missed_detections += 1
             continue
         
         idx = np.searchsorted(detection_times, t) - 1
@@ -160,6 +164,28 @@ class Plotter:
 
         self.roi_center =  roi_center
         self.roi_edge = roi_edge
+
+    def find_threshold(self, scale):
+
+        # time of the first trigger
+        trigger_time = self.press_timing[0, 0]
+        
+        # scale controlls the radius scale
+        roi, window_size, r = get_roi_circle(self.roi_center, self.roi_edge, scale=scale)
+
+        ts_filt, active_px = get_events_roi(self.events, roi)
+        rates, times = get_hist(ts_filt, 0.01, t_start=trigger_time-1, t_end=trigger_time)
+
+        max_rate_id = np.argmax(rates)
+        max_time = times[max_rate_id]
+        max_rate = rates[max_rate_id]
+
+        base_thresh = ((max_rate * 0.7) / window_size) / 0.01
+
+        print(f"Threshold: {max_rate * 0.7}, base threshold: {base_thresh}")
+
+        return base_thresh
+
         
     def plot_roi_scale(self, base_thresh, dataset_tres, scales, sequence_name):
         
@@ -435,7 +461,7 @@ class Plotter:
         for scale in tqdm(scales):
 
             # scale controlls the radius scale
-            roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+            roi, window_size, r = get_roi_circle(roi_center, roi_edge, radius=scale)
             frame_ratio = window_size / (640 * 480)
             frame_ratios.append(frame_ratio)
             ts_filt, active_px = get_events_roi(events, roi)
@@ -506,6 +532,48 @@ class Plotter:
         self.std_times = std_times
 
         return differences_ls, false_detections, missed_detections
+    
+    def compute_stats_thresh_scale(self, base_thresh_ls, scales, dataset_tres):
+        events = self.events
+        press_timing = self.press_timing
+        roi_center = self.roi_center
+        roi_edge = self.roi_edge
+
+        differences_ls = []
+        false_detections = []
+        missed_detections = []
+        frame_ratios = []
+
+        means = np.empty((len(scales), len(base_thresh_ls)))
+        false = np.empty((len(scales), len(base_thresh_ls)))
+        missed = np.empty((len(scales), len(base_thresh_ls)))
+
+        for i, scale in enumerate(tqdm(scales)):
+            for k, base_thresh in enumerate(tqdm(base_thresh_ls)):
+
+                # scale controlls the radius scale
+                roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+                frame_ratio = window_size / (640 * 480)
+                frame_ratios.append(frame_ratio)
+                ts_filt, active_px = get_events_roi(events, roi)
+
+                # measure the event rate
+                h, bins = get_hist(ts_filt, dataset_tres)
+
+                # scale the threshold depending on the time resolution and roi dimension
+                detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
+                detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+
+                differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
+                differences_ls.append(differences)
+                false_detections.append(false_detect)
+                missed_detections.append(missed_detect)
+
+                means[i, k] = np.nanmean(differences)
+                false[i, k] = np.nanmean(false_detect)
+                missed[i, k] = np.nanmean(missed_detect)
+
+        return means, false, missed
     
     def plot_hist(self, base_thresh, scale, dataset_tres, sequence_name):
         
