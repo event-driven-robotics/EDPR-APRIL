@@ -37,6 +37,7 @@ def get_roi_circle(center, edge, scale=1.0, radius=None):
     if radius is not None:
         r = int(radius)
 
+    print(f"Radius in px: {r}")
     mask = np.zeros((480, 640))
     circle_mask = cv2.circle(mask, center, r, color=(255, 255, 255), thickness=-1)
 
@@ -165,7 +166,9 @@ class Plotter:
         self.roi_center =  roi_center
         self.roi_edge = roi_edge
 
-    def find_threshold(self, scale):
+        print(roi_center)
+
+    def find_threshold(self, scale, p=0.7):
 
         # time of the first trigger
         trigger_time = self.press_timing[0, 0]
@@ -180,9 +183,9 @@ class Plotter:
         max_time = times[max_rate_id]
         max_rate = rates[max_rate_id]
 
-        base_thresh = ((max_rate * 0.7) / window_size) / 0.01
+        base_thresh = ((max_rate * p) / window_size) / 0.01
 
-        print(f"Threshold: {max_rate * 0.7}, base threshold: {base_thresh}")
+        print(f"Threshold: {max_rate * p}, base threshold: {base_thresh}")
 
         return base_thresh
 
@@ -575,7 +578,7 @@ class Plotter:
 
         return means, false, missed
     
-    def plot_hist(self, base_thresh, scale, dataset_tres, sequence_name):
+    def plot_hist(self, base_thresh, scale, dataset_tres, sequence_name, t_start=0.0, t_end=np.inf):
         
         events = self.events
         press_timing = self.press_timing
@@ -590,7 +593,7 @@ class Plotter:
         print(f"Roi area: {window_size}px / {640 * 480}, ratio: {frame_ratio}")
         ts_filt, active_px = get_events_roi(events, roi)
 
-        h, bins = get_hist(ts_filt, dataset_tres)
+        h, bins = get_hist(ts_filt, dataset_tres, t_start=t_start, t_end=t_end)
         ax.plot(bins[:-1], h)
         ax.fill_between(bins[:-1], h)
         # get y val for markers to be on the top of the plot
@@ -600,7 +603,12 @@ class Plotter:
         detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
         ax.axhline(y=detection_thresh, color='red', label="Detection threshold")
 
-        ax.scatter(press_timing[:, 0], [v for x in press_timing[:, 0]], marker="x", c="green", label="Fault button press", s=80)
+        timing_tmp = np.copy(press_timing)
+        timing_tmp = timing_tmp[np.logical_and(
+            timing_tmp[:, 0] < t_end,
+            timing_tmp[:, 0] > t_start)
+        ]
+        ax.scatter(timing_tmp[:, 0], [v for x in timing_tmp[:, 0]], marker="x", c="green", label="Fault button press", s=80)
         detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
         ax.scatter(detection_times, [v for x in detection_times], marker="x", c="blue", label="Detection time", s=80)
 
@@ -616,3 +624,44 @@ class Plotter:
         plt.figlegend(lines,labels, ncol=3)
 
         fig.tight_layout()
+
+    def plot_hist_ax(self, ax, base_thresh, scale, dataset_tres, sequence_name, t_start=0.0, t_end=np.inf, vline=False):
+        
+        events = self.events
+        press_timing = self.press_timing
+        roi_center = self.roi_center
+        roi_edge = self.roi_edge
+
+        # scale controlls the radius scale
+        roi, window_size, r = get_roi_circle(roi_center, roi_edge, scale=scale)
+        frame_ratio = window_size / (640 * 480)
+        print(f"Roi area: {window_size}px / {640 * 480}, ratio: {frame_ratio}")
+        ts_filt, active_px = get_events_roi(events, roi)
+
+        h, bins = get_hist(ts_filt, dataset_tres, t_start=t_start, t_end=t_end)
+        ax.plot(bins[:-1], h)
+        ax.fill_between(bins[:-1], h, alpha=0.6)
+        # get y val for markers to be on the top of the plot
+        plt_y_lim = ax.get_ylim()
+        v = plt_y_lim[1]
+
+        detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
+        ax.axhline(y=detection_thresh, color='red', label="Detection threshold")
+
+        timing_tmp = np.copy(press_timing)
+        timing_tmp = timing_tmp[np.logical_and(
+            timing_tmp[:, 0] < t_end,
+            timing_tmp[:, 0] > t_start)
+        ]
+        ax.scatter(timing_tmp[:, 0], [v for x in timing_tmp[:, 0]], marker="x", c="green", label="Fault button press", s=200)
+        detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+        ax.scatter(detection_times, [v for x in detection_times], marker="x", c="blue", label="Detection time", s=200)
+
+        if vline:
+            for t in timing_tmp[:, 0]:
+                ax.axvline(t)
+            for t in detection_times:
+                ax.axvline(t)
+
+        ax.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+        # ax.set_title(f"r: {r}px \t frame ratio: {frame_ratio * 100:.0f}%".expandtabs(), fontsize=14)
