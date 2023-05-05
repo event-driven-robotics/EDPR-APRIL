@@ -254,12 +254,14 @@ public:
         {
             vtr = true;
             scaler = 1;
+            roiSize = 12;
             yInfo() << "Velocity estimation method = Triplet";
         }
         else if(!method.compare("pxt"))
         {
             pxt = true;
             scaler = 1;
+            roiSize = 12;
             yInfo() << "Velocity estimation method = Pixel-wise Triplet";
         }
         if(!method.length()) yInfo() << "Velocity estimation method = NONE";
@@ -421,6 +423,8 @@ public:
         if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         if(vsf || ver || vcr) sf_velocity.queryEROS().copyTo(eros8);
+        if(vtr) trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        if(pxt) pw_trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         cv::cvtColor(eros8, img, cv::COLOR_GRAY2BGR);
         cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
     }
@@ -589,7 +593,11 @@ public:
             else if (movenet)
             {
                 static cv::Mat eros8;
-                pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+                // pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+                if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+                if(vsf || ver || vcr) sf_velocity.queryEROS().copyTo(eros8);
+                if(vtr) trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+                if(pxt) pw_trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
                 was_detected = mn_handler.update(eros8, tnow, detected_pose);
             }
 
@@ -678,8 +686,9 @@ public:
             for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
                 skel_vel[j] = skel_vel[j] * scaler;
             state.setVelocity(skel_vel);
-            if(vpx) state.updateFromVelocity(skel_vel, event_stats.timestamp);
-            else state.updateFromVelocity(skel_vel, event_stats.timestamp);
+            // if(vpx) state.updateFromVelocity(skel_vel, event_stats.timestamp);
+            // else state.updateFromVelocity(skel_vel, event_stats.timestamp);
+            state.updateFromVelocity(skel_vel, event_stats.timestamp);
 
             skelwriter.write({event_stats.timestamp, latency, state.query()});
             velwriter.write({event_stats.timestamp, latency, skel_vel});
