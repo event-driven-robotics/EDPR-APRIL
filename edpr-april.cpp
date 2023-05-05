@@ -669,9 +669,8 @@ public:
 
             if(pxt)
             {
-                skel_vel = pw_trip_velocity.query(state.query(), event_stats.timestamp, roiSize, 1);
                 pw_trip_velocity.updateSAE(input_events.begin(), input_events.end()); 
-                // yInfo() << event_stats.timestamp;
+                skel_vel = pw_trip_velocity.query(state.query(), event_stats.timestamp, roiSize, 1);
             }
             
             // this scaler was thought to be from timestamp misconversion.
