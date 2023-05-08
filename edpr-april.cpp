@@ -158,7 +158,7 @@ private:
     bool movenet{false}, use_gt{false};
     int detF{10}, roiSize{20};
     double scaler{12.5};
-    bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false};
+    bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false}, visSAE{false};
     bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false}, pxt{false};
     bool latency_compensation{true}, delay{false};
     double th_period{0.01};
@@ -215,6 +215,7 @@ public:
         latency_compensation = rf.check("use_lc") && rf.check("use_lc", Value(true)).asBool();
         double lc = latency_compensation ? 1.0 : 0.0;
         scaler = rf.check("sc", Value(12.5)).asFloat64();
+        visSAE = rf.check("sae") && rf.check("sae", Value(true)).asBool();
 
         // pltDet = true;
         pltTra = true;
@@ -364,12 +365,13 @@ public:
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", image_size);
 
-        cv::namedWindow("SAE-positive", cv::WINDOW_NORMAL);
-        cv::resizeWindow("SAE-positive", image_size);
-
-        cv::namedWindow("SAE-negative", cv::WINDOW_NORMAL);
-        cv::resizeWindow("SAE-negative", image_size);
-
+        if(visSAE)
+        {
+            cv::namedWindow("SAE-positive", cv::WINDOW_NORMAL);
+            cv::resizeWindow("SAE-positive", image_size);
+            cv::namedWindow("SAE-negative", cv::WINDOW_NORMAL);
+            cv::resizeWindow("SAE-negative", image_size);
+        }
 
         // set-up ROS interface
         if (ros)
@@ -429,7 +431,6 @@ public:
         cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
     }
 
-    // void drawSAE(cv::Mat img)
     void drawSAE()
     {
         cv::Mat saep8, saen8;
@@ -466,7 +467,7 @@ public:
         static cv::Mat canvas = cv::Mat(image_size, CV_8UC3);
         canvas.setTo(cv::Vec3b(0, 0, 0));
 
-        if(started) drawSAE();
+        if(started && visSAE) drawSAE();
         // plot the image
         // check if we plot events or alternative (PIM or EROS)
         if (alt_view)
