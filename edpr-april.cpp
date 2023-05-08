@@ -364,11 +364,11 @@ public:
         cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
         cv::resizeWindow("edpr-april", image_size);
 
-        // cv::namedWindow("SAE-positive", cv::WINDOW_NORMAL);
-        // cv::resizeWindow("SAE-positive", image_size);
+        cv::namedWindow("SAE-positive", cv::WINDOW_NORMAL);
+        cv::resizeWindow("SAE-positive", image_size);
 
-        // cv::namedWindow("SAE-negative", cv::WINDOW_NORMAL);
-        // cv::resizeWindow("SAE-negative", image_size);
+        cv::namedWindow("SAE-negative", cv::WINDOW_NORMAL);
+        cv::resizeWindow("SAE-negative", image_size);
 
 
         // set-up ROS interface
@@ -432,26 +432,18 @@ public:
     // void drawSAE(cv::Mat img)
     void drawSAE()
     {
-        // cv::Mat sae = cv::Mat::zeros(image_size, CV_64F);
-        // if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
-        // if(vpx) pw_velocity.queryEROS().copyTo(eros8);
-        // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
-        // sf_velocity.querySAE().convertTo(sae, CV_8U, 255);
-        // cv::Mat aux;
-        // trip_velocity.querySAEN();
-        // aux +=200;
-        // aux.copyTo(img);
-        // cv::normalize(aux,img, 0, 255, cv::NORM_MINMAX);
-        // saesf_velocity.querySAE().copyTo(sae);
-        // cv::Mat Temp;
-        // sae.convertTo(Temp, CV_8U);
-        // cv::Mat Result;
-        // cv::cvtColor(sae, img, CV_BGRA2BGR);
-        // cv::cvtColor(sae, img, cv::COLOR_GRAY2BGRA);
-        // cv::cvtColor(Temp, img, cv::COLOR_GRAY2BGR);
-        // cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0);
-        cv::imshow("SAE-positive", trip_velocity.querySAEP());
-        cv::imshow("SAE-negative", trip_velocity.querySAEN());
+        cv::Mat saep8, saen8;
+        cv::Mat SAE_vis, SAEout;
+        // positive
+        pw_trip_velocity.querySAEP().copyTo(saep8);
+        cv::normalize(saep8, SAE_vis, 0, 1, cv::NORM_MINMAX);
+        SAE_vis.convertTo(SAEout, CV_32F, 1);
+        cv::imshow("SAE-positive", SAEout);
+        // negative
+        pw_trip_velocity.querySAEN().copyTo(saen8);
+        cv::normalize(saen8, SAE_vis, 0, 1, cv::NORM_MINMAX);
+        SAE_vis.convertTo(SAEout, CV_32F, 1);
+        cv::imshow("SAE-negative", SAEout);
     }
 
     void drawROI(cv::Mat img)
@@ -474,7 +466,7 @@ public:
         static cv::Mat canvas = cv::Mat(image_size, CV_8UC3);
         canvas.setTo(cv::Vec3b(0, 0, 0));
 
-        // drawSAE();
+        if(started) drawSAE();
         // plot the image
         // check if we plot events or alternative (PIM or EROS)
         if (alt_view)
