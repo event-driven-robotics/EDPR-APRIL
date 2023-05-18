@@ -225,6 +225,7 @@ public:
         if(!method.compare("px"))
         {
             vpx = true;
+            scaler = 8;
             yInfo() << "Velocity estimation method = Pixel-wise";
         }
         else if(!method.compare("surf"))
@@ -255,14 +256,14 @@ public:
         {
             vtr = true;
             scaler = 1;
-            roiSize = 12;
+            // roiSize = 12;
             yInfo() << "Velocity estimation method = Triplet";
         }
         else if(!method.compare("pxt"))
         {
             pxt = true;
-            scaler = 1;
-            roiSize = 12;
+            scaler = 1.5;
+            // roiSize = 32;
             yInfo() << "Velocity estimation method = Pixel-wise Triplet";
         }
         if(!method.length()) yInfo() << "Velocity estimation method = NONE";
@@ -621,6 +622,8 @@ public:
         input_events.readPacket(true);
         double t0 = Time::now();
         std:vector<double> sklt_out, vel_out;
+        double t1, t2, dt;
+        double ts0;
 
         while (!isStopping())
         {
@@ -632,7 +635,11 @@ public:
             if (event_stats.count == 0)
                 continue;
 
-            if(!started) started = true;
+            if(!started)
+            {
+                started = true;
+                ts0 = event_stats.timestamp;
+            } 
 
             // update images
             for (auto &v : input_events)
@@ -643,6 +650,7 @@ public:
                     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
             }
 
+            t1 = Time::now();
             if(vpx || vtr) pw_velocity.update(input_events.begin(), input_events.end());
             
 
@@ -670,10 +678,12 @@ public:
 
             if(pxt)
             {
-                pw_trip_velocity.updateSAE(input_events.begin(), input_events.end()); 
-                skel_vel = pw_trip_velocity.query(state.query(), event_stats.timestamp, roiSize, 1);
+                pw_trip_velocity.updateSAE(input_events.begin(), input_events.end(), event_stats.timestamp-ts0); 
+                skel_vel = pw_trip_velocity.query(state.query(), event_stats.timestamp-ts0, roiSize, 1);
             }
             
+            // yInfo() << event_stats.timestamp;
+            // hpecore::print_skeleton(skel_vel);
             // this scaler was thought to be from timestamp misconversion.
             // instead we aren't sure why it is needed.
             for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
@@ -683,8 +693,13 @@ public:
             // else state.updateFromVelocity(skel_vel, event_stats.timestamp);
             state.updateFromVelocity(skel_vel, event_stats.timestamp);
 
-            skelwriter.write({event_stats.timestamp, latency, state.query()});
-            velwriter.write({event_stats.timestamp, latency, skel_vel});
+            t2 = Time::now();
+            dt = (t2 - t1) * 1e3;
+            skelwriter.write({event_stats.timestamp, dt, state.query()});
+            velwriter.write({event_stats.timestamp, dt, skel_vel});
+
+            // skelwriter.write({event_stats.timestamp, latency, state.query()});
+            // velwriter.write({event_stats.timestamp, latency, skel_vel});
 
             if (ros)
             {
