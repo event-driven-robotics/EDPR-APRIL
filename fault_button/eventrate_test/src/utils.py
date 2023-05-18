@@ -74,13 +74,13 @@ def get_hist(ts_filt, dataset_tres, t_start=0.0, t_end=np.inf):
     return np.histogram(ts_filt_range_1, bins=hist_bins);
     # return ax.hist(ts_filt_range_1, bins=hist_bins, histtype="stepfilled");    
 
-def get_detections(h, detection_thresh, bins, dataset_tres):
+def get_detections(h, detection_thresh, bins, dataset_tres, presses=None):
     # extract the detection times. We only want the time when the event-rate crosses the threshold
     # there is a small refractory period to ignore detections close to each other. Only the first one is kept
     detection_times = []
     detected = False
     detected_time = 0.0
-    detection_refract = 0.8
+    detection_refract = 1.0
     for i, rate in enumerate(h):
         if not detected and rate > detection_thresh:
             # consider the time at the end of the considered time bin
@@ -90,13 +90,22 @@ def get_detections(h, detection_thresh, bins, dataset_tres):
         if detected and np.abs(detected_time - bins[i+1]) > detection_refract:
             detected = False
 
+    press_refract = 5.0
+    if presses is not None:
+        for i, d in enumerate(detection_times):
+            diff = d - presses
+            if np.any(np.logical_and(diff <= press_refract,
+                                     diff >= 0.0)):
+                detection_times.pop(i)
+
+
     return detection_times
 
 def measure_time_difference(detection_times, press_timing):
     differences = []
     false_detections = 0
     missed_detections = 0
-    valid_time = 2.0
+    valid_time = 1.0
     
     if len(detection_times) == 0:
             missed_detections = len(press_timing)
@@ -124,7 +133,7 @@ def measure_time_difference(detection_times, press_timing):
 
     return differences, false_detections, missed_detections
 
-def get_threshold(base_thresh, tres, window_size, scale):
+def get_threshold(base_thresh, tres, window_size, scale=1):
     return base_thresh * tres * window_size
 
 class Plotter:
@@ -167,6 +176,33 @@ class Plotter:
         self.roi_edge = roi_edge
 
         print(roi_center)
+
+    def get_hist(self, scale=1):
+        
+        # scale controlls the radius scale
+        roi, window_size, r = get_roi_circle(self.roi_center, self.roi_edge, scale=scale)
+        self.window_size = window_size
+        ts_filt, active_px = get_events_roi(self.events, roi)
+        return get_hist(ts_filt, 0.01)
+    
+    def isPressedAfter(self, press_timings, t, t_range=1.0):
+        # 
+
+        t_diffs = press_timings - t
+        valid = np.logical_and(t_diffs >= 0,
+                           t_diffs <= t_range)
+        
+        return np.any(valid), np.argwhere(valid == True)
+    
+    def isFalse(self, t, t_range=5.0):
+        # t is the time of a detection
+        # the func returns true if it is a false detection
+
+        t_diffs = np.abs(self.press_timing[:, 0] - t)
+        valid = t_diffs <= t_range
+        
+        return ~np.any(valid)
+
 
     def find_threshold(self, scale, p=0.7):
 
@@ -517,7 +553,7 @@ class Plotter:
 
             # scale the threshold depending on the time resolution and roi dimension
             detection_thresh = get_threshold(base_thresh, dataset_tres, window_size, scale)
-            detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+            detection_times = get_detections(h, detection_thresh, bins, dataset_tres, self.press_timing[:, 0])
 
             differences, false_detect, missed_detect = measure_time_difference(detection_times, press_timing)
             differences_ls.append(differences)
@@ -609,7 +645,7 @@ class Plotter:
             timing_tmp[:, 0] > t_start)
         ]
         ax.scatter(timing_tmp[:, 0], [v for x in timing_tmp[:, 0]], marker="x", c="green", label="Fault button press", s=80)
-        detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
+        detection_times = get_detections(h, detection_thresh, bins, dataset_tres, self.press_timing[:, 0])
         ax.scatter(detection_times, [v for x in detection_times], marker="x", c="blue", label="Detection time", s=80)
 
         ax.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
@@ -625,7 +661,7 @@ class Plotter:
 
         fig.tight_layout()
 
-    def plot_hist_ax(self, ax, base_thresh, scale, dataset_tres, sequence_name, t_start=0.0, t_end=np.inf, vline=False):
+    def plot_hist_ax(self, ax, base_thresh, scale, dataset_tres, sequence_name, t_start=0.0, t_end=np.inf, vline=False, show_presses=True):
         
         events = self.events
         press_timing = self.press_timing
@@ -653,7 +689,8 @@ class Plotter:
             timing_tmp[:, 0] < t_end,
             timing_tmp[:, 0] > t_start)
         ]
-        ax.scatter(timing_tmp[:, 0], [v for x in timing_tmp[:, 0]], marker="x", c="green", label="Fault button press", s=200)
+        if show_presses:
+            ax.scatter(timing_tmp[:, 0], [v for x in timing_tmp[:, 0]], marker=7, c='green', label="Fault button press", s=200)
         detection_times = get_detections(h, detection_thresh, bins, dataset_tres)
         ax.scatter(detection_times, [v for x in detection_times], marker="x", c="blue", label="Detection time", s=200)
 
@@ -665,3 +702,100 @@ class Plotter:
 
         ax.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
         # ax.set_title(f"r: {r}px \t frame ratio: {frame_ratio * 100:.0f}%".expandtabs(), fontsize=14)
+
+    def get_trigger_rates(self, rates, times, ratio=3/4, use_max=False):
+        # get the maximum rates around actual button presses
+
+        press_times = self.press_timing[:, 0]
+        trigger_rates = []
+        trigger_times = []
+
+        for i, pt in enumerate(press_times):
+            id_start = np.searchsorted(times, pt -1.0)
+            id_end = np.searchsorted(times, pt)
+
+            tmp_rates = rates[id_start:id_end]
+            tmp_rates = np.sort(tmp_rates)
+            id_start = int(len(tmp_rates)  * ratio)
+            if not use_max:
+                tmp_rates = tmp_rates[id_start:]
+            else:
+                tmp_rates = [tmp_rates[id_start:].max()]
+            for r in tmp_rates:
+                trigger_rates.append(r)
+                trigger_times.append(pt)
+
+        return trigger_rates, trigger_times
+    
+    def measure_mean_rates(self, rates, times, trigger_rates, trigger_times):
+        # total mean rate and standard deviation at each timestep
+        std_total_rate = np.zeros(rates.shape)
+        mean_total_rate = np.zeros(rates.shape)
+        # trigger mean rate and standard deviation at each timestep
+        mean_trigger_rate = np.zeros(rates.shape)
+        std_trigger_rate = np.zeros(rates.shape)
+
+        for i, t in enumerate(times[1:]):
+            # total
+            std_total_rate[i] = np.std(rates[:i+1])
+            mean_total_rate[i] = np.mean(rates[:i+1])
+            # mean
+            idx = np.searchsorted(trigger_times, t)
+            mean_trigger_rate[i] = np.mean(trigger_rates[:idx])
+            std_trigger_rate[i] = np.std(trigger_rates[:idx])
+
+        self.times = times
+        self.mean_total_rate = mean_total_rate
+        self.std_total_rate = std_total_rate
+        self.mean_trigger_rate = mean_trigger_rate
+        self.std_trigger_rate = std_trigger_rate
+
+        return mean_total_rate, std_total_rate, mean_trigger_rate, std_trigger_rate
+
+    def automatic_threshold(self):
+        # return a list of thresholds, on for each timestep
+        
+        times = self.times
+        mean_total_rate = self.mean_total_rate
+        std_total_rate = self.std_total_rate
+        mean_trigger_rate = self.mean_trigger_rate
+        std_trigger_rate = self.std_trigger_rate
+
+        thresh_hist = []
+        for i, _ in enumerate(times[1:]):
+            trigger_mean = mean_trigger_rate[i] if ~np.isnan(mean_trigger_rate[i]) and mean_trigger_rate[i] > 0 else 0
+            trigger_std = std_trigger_rate[i] if ~np.isnan(std_trigger_rate[i]) and std_trigger_rate[i] > 0 else 100
+
+            total_mean = mean_total_rate[i]
+            total_std = std_total_rate[i] if ~np.isnan(std_total_rate[i]) and std_total_rate[i] > 0 else 1
+
+            x = self.find_threshold_gaussian(total_mean, total_std, trigger_mean, trigger_std)
+            thresh_hist.append(x)
+
+        return thresh_hist
+
+        
+    def find_threshold_gaussian(self, total_mean, total_std, trigger_mean, trigger_std):
+        x = self._findIntersection(trigger_mean, total_mean, trigger_std, total_std)
+
+        if x.size > 1:
+            x = x[x > total_mean]
+            x = x[x < trigger_mean]
+            if x.size == 0:
+                x = 0
+            else:
+                x = x.min()
+        
+        return x
+
+    def _findIntersection(self, m1, m2, std1, std2):
+        a = 1/(2*std1**2) - 1/(2*std2**2)
+        b = m2/(std2**2) - m1/(std1**2)
+        c = m1**2 /(2*std1**2) - m2**2 / (2*std2**2) - np.log(std2/std1)
+        return np.roots([a,b,c])
+
+
+
+        
+
+        
