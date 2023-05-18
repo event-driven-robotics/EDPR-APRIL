@@ -147,10 +147,11 @@ public:
     void fbr_draw()
     {
         cv::Mat img_display; img.copyTo(img_display);
-        cv::putText(img_display, "DRAW Fault Region. Click and drag.", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         
         cv::circle(img_display, c_fbr.c, c_fbr.r, {120, 10, 10}, -1);
         cv::circle(img_display, c_fbr.c, c_fbr.r, {255, 0, 0}, 4);
+
+        cv::putText(img_display, "DRAW Fault Region. Click and drag. " + std::to_string(c_fbr.r), cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
 
         cv::imshow(getName(), img_display);
         char c = cv::waitKey(1);
@@ -175,17 +176,23 @@ public:
         cv::circle(img, c_fbr.c, c_fbr.r, {120, 120, 120}, 4);
         for(auto &v : input_events) {
             if(mask.at<char>(v.y, v.x)) {
-                img.at<cv::Vec3b>(v.y, v.x) = {0, 0, 200};
+                img.at<cv::Vec3b>(v.y, v.x) = {0, 200, 0};
                 count++;
             } else {
                 img.at<cv::Vec3b>(v.y, v.x) = {128, 128, 128};
             }
         }
-
-        if(count > T * k)
+        if(count > T * k){
             cv::circle(img, c_fbr.c, c_fbr.r, {0, 0, 255}, 6);
+            for(auto &v : input_events) {
+            if(mask.at<char>(v.y, v.x)) {
+                img.at<cv::Vec3b>(v.y, v.x) = {0, 0, 200};
+                count++;
+            }
+        }
+        }
 
-        cv::putText(img, "Monitoring Visual Fault Button", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img, "Monitoring Visual Fault Button ", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
 
         cv::imshow(getName(), img);
         char c = cv::waitKey(1);
