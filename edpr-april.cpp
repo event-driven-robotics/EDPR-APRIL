@@ -13,6 +13,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <vector>
 #include <string>
 #include "april_msgs/NC_humanPose.h"
+#include <yarp/rosmsg/sensor_msgs/Image.h>
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -161,7 +162,7 @@ private:
     bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false}, visSAE{false};
     bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false}, pxt{false};
     bool latency_compensation{true}, delay{false};
-    double th_period{0.01};
+    double th_period{0.01}, thF{100.0};
     bool dhp19{false};
     bool pltRoi{false};
     cv::Scalar colors[13] = {{0, 0, 180}, {0, 180, 0}, {0, 0, 180},
@@ -169,11 +170,14 @@ private:
                             {120, 0, 180}, {120, 180, 0}, {0, 120, 180},
                             {120, 120, 180}, {120, 180, 120}, {120, 120, 180}, {120, 120, 120}};
     bool started{false};
+    double tnow;
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
     yarp::os::Publisher<yarp::rosmsg::NC_humanPose> ros_publisher;
     yarp::rosmsg::NC_humanPose ros_output;
+    typedef yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ImageTopicType;
+    ImageTopicType publisherPort_eros, publisherPort_evs;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -216,6 +220,8 @@ public:
         double lc = latency_compensation ? 1.0 : 0.0;
         scaler = rf.check("sc", Value(12.5)).asFloat64();
         visSAE = rf.check("sae") && rf.check("sae", Value(true)).asBool();
+        thF = rf.check("thF", Value(100.0)).asFloat64();
+        th_period = 1/thF;
 
         // pltDet = true;
         pltTra = true;
@@ -340,7 +346,7 @@ public:
             std::string videopath = rf.find("v").asString();
             if (!output_video.open(videopath,
                                    cv::VideoWriter::fourcc('H', '2', '6', '4'),
-                                   (int)(1 / th_period),
+                                   (int)(thF),
                                    image_size,
                                    true))
             {
@@ -378,13 +384,29 @@ public:
         if (ros)
         {
             ros_node = new yarp::os::Node("/APRIL");
-            if (!ros_publisher.topic("/isim/neuromorphic_camera/data"))
+            if (!ros_publisher.topic("/pem/neuromorphic_camera/data"))
             {
-                yError() << "Could not open ROS output publisher";
+                yError() << "Could not open ROS pose output publisher";
                 return false;
             }
             else
-                yInfo() << "ROS output publisher: OK";
+                yInfo() << "ROS pose output publisher: OK";
+
+            if (!publisherPort_eros.topic("/pem/neuromorphic_camera/eros"))
+            {
+                yError() << "Could not open ROS EROS output publisher";
+                return false;
+            }
+            else
+                yInfo() << "ROS EROS output publisher: OK";
+
+            if (!publisherPort_evs.topic("/pem/neuromorphic_camera/evs"))
+            {
+                yError() << "Could not open ROS EVS output publisher";
+                return false;
+            }
+            else
+                yInfo() << "ROS EVS output publisher: OK";
         }
 
 
@@ -478,6 +500,33 @@ public:
             vis_image.copyTo(canvas);
         if(pltRoi)
             drawROI(canvas);
+
+        if (ros)
+        {
+            // publish images using ROS
+            // EROS
+            static cv::Mat cvEROS = cv::Mat(image_size, CV_8UC3);
+            cvEROS.setTo(cv::Vec3b(0, 0, 0));
+            drawEROS(cvEROS);
+            auto yarpEROS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEROS);
+            yarp::rosmsg::sensor_msgs::Image& rosEROS = publisherPort_eros.prepare();
+            rosEROS.data.resize(yarpEROS.getRawImageSize());
+            rosEROS.width = yarpEROS.width();
+            rosEROS.height = yarpEROS.height();
+            memcpy(rosEROS.data.data(), yarpEROS.getRawImage(), yarpEROS.getRawImageSize());
+            publisherPort_eros.write();
+            // EV image
+            static cv::Mat cvEVS = cv::Mat(image_size, CV_8UC3);
+            cvEVS.setTo(cv::Vec3b(0, 0, 0));
+            vis_image.copyTo(cvEVS);
+            auto yarpEVS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEVS);
+            yarp::rosmsg::sensor_msgs::Image& rosEVS = publisherPort_evs.prepare();
+            rosEVS.data.resize(yarpEVS.getRawImageSize());
+            rosEVS.width = yarpEVS.width();
+            rosEVS.height = yarpEVS.height();
+            memcpy(rosEVS.data.data(), yarpEVS.getRawImage(), yarpEVS.getRawImageSize());
+            publisherPort_evs.write();
+        }
 
         vis_image.setTo(cv::Vec3b(0, 0, 0));
 
@@ -576,7 +625,7 @@ public:
 
         while (!isStopping())
         {
-            double tnow = Time::now() - t0;
+            tnow = Time::now() - t0;
 
             // ---------- DETECTIONS ----------
             bool was_detected = false;
@@ -644,10 +693,11 @@ public:
             // update images
             for (auto &v : input_events)
             {
-                if (v.p)
-                    vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(64, 150, 90);
-                else
-                    vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
+                // if (v.p)
+                //     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(64, 150, 90);
+                // else
+                //     vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(32, 82, 50);
+                vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(255, 255, 255);
             }
 
             t1 = Time::now();
