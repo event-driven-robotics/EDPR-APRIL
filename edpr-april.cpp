@@ -160,7 +160,7 @@ private:
     int detF{10}, roiSize{20};
     double scaler{12.5};
     bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false}, gpu{false}, ros{false}, visSAE{false};
-    bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false}, pxt{false};
+    bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false}, pxt{false}, noVE{false};
     bool latency_compensation{true}, delay{false};
     double th_period{0.01}, thF{100.0};
     bool dhp19{false};
@@ -171,6 +171,7 @@ private:
                             {120, 120, 180}, {120, 180, 120}, {120, 120, 180}, {120, 120, 120}};
     bool started{false};
     double tnow;
+    bool poseWr{false}, velWr{false};
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
@@ -272,7 +273,11 @@ public:
             // roiSize = 32;
             yInfo() << "Velocity estimation method = Pixel-wise Triplet";
         }
-        if(!method.length()) yInfo() << "Velocity estimation method = NONE";
+        if(!method.length())
+        {
+            noVE = true;
+            yInfo() << "Velocity estimation method = NONE";
+        }
 
         if(dhp19)
         {
@@ -332,13 +337,19 @@ public:
         {
             std::string filepath = rf.find("filepath").asString();
             if (skelwriter.open(filepath))
+            {
                 yInfo() << "saving data to:" << filepath;
+                poseWr = true;
+            }
         }
         if (rf.check("velpath"))
         {
             std::string velpath = rf.find("velpath").asString();
             if (velwriter.open(velpath))
+            {
                 yInfo() << "saving velocity data to:" << velpath;
+                velWr = true;
+            }
         }
 
         if (rf.check("v"))
@@ -445,7 +456,7 @@ public:
     void drawEROS(cv::Mat img)
     {
         cv::Mat eros8;
-        if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+        if(vpx || noVE) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         // if(vsf || ver || vcr) sf_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
         if(vsf || ver || vcr) sf_velocity.queryEROS().copyTo(eros8);
         if(vtr) trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
@@ -637,7 +648,7 @@ public:
             {
                 static cv::Mat eros8;
                 // pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
-                if(vpx) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
+                if(vpx || noVE) pw_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
                 if(vsf || ver || vcr) sf_velocity.queryEROS().copyTo(eros8);
                 if(vtr) trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
                 if(pxt) pw_trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
@@ -701,7 +712,7 @@ public:
             }
 
             t1 = Time::now();
-            if(vpx || vtr) pw_velocity.update(input_events.begin(), input_events.end());
+            if(vpx || vtr || noVE) pw_velocity.update(input_events.begin(), input_events.end());
             
 
             // only update velocity if the pose is initialised
@@ -745,8 +756,8 @@ public:
 
             t2 = Time::now();
             dt = (t2 - t1) * 1e3;
-            skelwriter.write({event_stats.timestamp, dt, state.query()});
-            velwriter.write({event_stats.timestamp, dt, skel_vel});
+            if(poseWr) skelwriter.write({event_stats.timestamp, dt, state.query()});
+            if(velWr) velwriter.write({event_stats.timestamp, dt, skel_vel});
 
             // skelwriter.write({event_stats.timestamp, latency, state.query()});
             // velwriter.write({event_stats.timestamp, latency, skel_vel});
