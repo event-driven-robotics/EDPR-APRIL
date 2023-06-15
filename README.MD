@@ -21,21 +21,15 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
     $ cd <workspace>
     $ git clone git@github.com:event-driven-robotics/EDPR-APRIL.git
     $ cd EDPR-APRIL
-    $ docker build -t event-pose --ssh default --build-arg ssh_pub_key="$(cat ~/.ssh/id_rsa.pub)" --build-arg ssh_prv_key="$(cat ~/.ssh/id_rsa)" - < Dockerfile
+    $ docker build -t april-event-pose - < Dockerfile
     ```
 :bulb: `<workspace>` is the parent directory in which the repository is cloned
-
-:bulb: The ssh keys are required to access and build this repository from within the docker, as it is currently private. [Create a new ssh key](https://docs.github.com/en/github/authenticating-to-github/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) if required.
-
-:warning: Ensure your ssh key is built without a passphrase.
-
-:bulb: Your ssh key may have a different name (e.g. id_ed25519.pub). Change in the command as necessary.
 
 ## Usage
 - Run the Docker container and, inside it, run the pose detector
     ```shell
     $ xhost +
-    $ docker run -it --privileged --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev/bus/usb:/dev/bus/usb -e DISPLAY=unix$DISPLAY --runtime=nvidia --name event-pose event-pose
+    $ docker run -it --privileged --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev/bus/usb:/dev/bus/usb -e DISPLAY=unix$DISPLAY --runtime=nvidia --name april-event-pose april-event-pose
     ```
 
 :bulb: use `-v <local_dir>:<container_dir>` to mount further folders inside the container in order to transfer data between your local machine and the container, if needed.
