@@ -23,7 +23,7 @@ private:
     cv::Size img_size{{640, 480}};
 
     //parameters
-    double k{0.2};       // seconds in window
+    double k{0.01};       // seconds in window
     double p{0.01};      // detection rate
     double T{2e6};       // threshold events/second
 
@@ -39,26 +39,29 @@ private:
 
     circle_parameters c_fbr{{0,0},0,false};
 
-    typedef struct rate_stats {
-        float mean;
-        float var;
-        int count;
-    } rate_stats;
-    
-    rate_stats total_stats{0.0, 0.0, 0};
-    rate_stats trigger_stats{0.0, 0.0, 0};
-
+    // strcts for 
     typedef struct rate_buffer {
         float time;
-        std::queue<int> *buffer;
+        std::deque<int> *buffer;
         int count;
     } rate_buffer;
 
-    std::queue<int> trigger_buffer;
+    std::deque<int> trigger_buffer;
 
     rate_buffer trig_buffer{0.0, &trigger_buffer, 0};
 
+    std::vector<int> rest_rates;
+    std::vector<int> trigger_rates;
+
+    // threshold adaptation parameters
+    double buffer_time{1.0}; // time in seconds for buffer
+    // the actual dimension of the buffer depends on the time
+    // resolution(k) used fot the detection
+    int buffer_size{100};
+
+    // threshold adaptation variables
     bool autoThresh{true};
+    bool button_pressed{false};
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -82,9 +85,10 @@ public:
 
         // =====READ PARAMETERS=====
 
-        k = rf.check("k", Value(0.001)).asFloat64();
-        p = rf.check("p", Value(0.001)).asFloat64();
+        k = rf.check("k", Value(0.01)).asFloat64();
+        p = rf.check("p", Value(0.01)).asFloat64();
         T = rf.check("T", Value(5e5)).asFloat64();
+        buffer_time = rf.check("b", Value(1.0)).asFloat64();
 
         // ===== TRY DEFAULT CONNECTIONS =====
         Network::connect("/file/ch0dvs:o",  getName("/AE:i"), "fast_tcp");
@@ -96,6 +100,8 @@ public:
         cv::namedWindow(getName(),  cv::WINDOW_KEEPRATIO);
         cv::resizeWindow(getName(), {640, 480});
 
+        // threshold adaptation parameters
+        buffer_size = (int) buffer_time / k;
 
         return true;
     }
@@ -204,110 +210,167 @@ public:
                 img.at<cv::Vec3b>(v.y, v.x) = {128, 128, 128};
             }
         }
-        
-        updateStats(&total_stats, static_cast<float>(count));
-        updateRateBuffer(&trig_buffer, count);
-        
-        if(count > T * k){
+        // change displayed events color no notify a trigger
+        if(count > T * k && trig_buffer.count >= 0){
             cv::circle(img, c_fbr.c, c_fbr.r, {0, 0, 255}, 6);
             for(auto &v : input_events) {
-            if(mask.at<char>(v.y, v.x)) {
-                img.at<cv::Vec3b>(v.y, v.x) = {0, 0, 200};
+                if(mask.at<char>(v.y, v.x)) {
+                    img.at<cv::Vec3b>(v.y, v.x) = {0, 0, 200};
+                }
             }
         }
-        }
-
+        // show
         cv::putText(img, "Monitoring Visual Fault Button", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img, "Total rate: " + std::to_string(total_stats.mean), cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img, "Trigger rate: " + std::to_string(trigger_stats.mean), cv::Point(img_size.width*0.05, img_size.height*0.1), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img, "Current threshold: " + std::to_string(T * k), cv::Point(img_size.width*0.05, img_size.height*0.15), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img, "Current rate: " + std::to_string(count), cv::Point(img_size.width*0.05, img_size.height*0.10), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img, "Current threshold: " + std::to_string(T * k), cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img, "count: " + std::to_string(trig_buffer.count), cv::Point(img_size.width*0.05, img_size.height*0.15), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         cv::imshow(getName(), img);
         char c = cv::waitKey(1);
-
+        // handle button presses
         if(c == '\e')
             state = FINISHED;
         else if(c == ' ') {
             // space represent a button press
-            // update the statistics and the threshold
-            for(int i=0; i<trig_buffer.count; i++)
-            {
-                updateStats(&trigger_stats, trig_buffer.buffer->front());
-                trig_buffer.buffer->pop();
-                trig_buffer.count --;
-            }
             yInfo() << "button pressed";
-            if(autoThresh)
-                updateThreshold();
-        }
-        else if(c == 'o')
-        {
-            // manual adjustment of the threshold
-            // increase the threshold
-            // TODO make increment configurable
-            T += 1 * k * cv::countNonZero(mask);
-            yInfo() << cv::countNonZero(mask);
-        }
-        else if (c == 'l')
-        {
-            T -= 1 * k * cv::countNonZero(mask);
+            button_pressed = true;
         }
         else if(c == 'a')
-        {
+        {   
+            // disable / enabele automatic threshold
             autoThresh = !autoThresh;
             if(autoThresh)
                 yInfo() << "automatic threhsold enabled";
             else
                 yInfo() << "automatic threhsold disabed";
         }
+
+        if(autoThresh)
+            thresholdCheck(count);
     }
 
-    void updateRateBuffer(rate_buffer *rate_buffer, int count)
-    {
-        rate_buffer->buffer->push(count);
+    void thresholdCheck(int count)
+    {    
+        bool updated_lists = false; // if a list was updated
+
+        // count is the detected event rate in the roi
+        int removed_rate = updateRateBuffer(&trig_buffer, count);
+
+        // add removed rate to rest rates list
+        if(removed_rate > T * k) // current threshold
+        {   
+            rest_rates.push_back(removed_rate);
+            updated_lists = true;
+        }
+
+        if(button_pressed){
+            // add all rates to trigger rates list (or part of them)
+            // remove all the rates from the buffer
+
+            std::vector<int> tmp_buffer(100, -1); // TODO less than 100 rates
+            std::copy(trig_buffer.buffer->cbegin(), trig_buffer.buffer->cend(), tmp_buffer.begin());
+            std::sort(tmp_buffer.begin(), tmp_buffer.end());
+            // add only the highest quartile of the trigger rates, this gives more accurate results
+            for(int i=(int)0.75*buffer_size; i<buffer_size; i++){
+                if(tmp_buffer[i] > 0)
+                    trigger_rates.push_back(tmp_buffer[i]);
+            }
+
+            //empty the trig_buffer
+            trig_buffer.buffer->clear();
+            // TODO make configurable
+            trig_buffer.count = - 3 * buffer_size;
+
+            button_pressed = false;
+            updated_lists = true;
+        }
+
+        // if either of the rest or trigger rates list was updated, 
+        // update the threshold
+        if(updated_lists && autoThresh)
+            updateThreshold();
+    }
+
+    int updateRateBuffer(rate_buffer *rate_buffer, int count)
+    {   
         rate_buffer->count ++;
-        // the buffer should correspond to 1 second
-        // TODO: calculate based on actual time res and configurable window parameter
-        if(rate_buffer->count > 100)
-        {
-            rate_buffer->buffer->pop();
+        if(rate_buffer->count >= 0)
+            rate_buffer->buffer->push_back(count);
+    
+        int head = -1;
+        if(rate_buffer->count > buffer_size)
+        {   
+            head = rate_buffer->buffer->front();
+            rate_buffer->buffer->pop_front();
             rate_buffer->count --;
         }
-    }
 
-    void updateStats(rate_stats *stats, float new_value)
-    {
-        float new_mean = stats->mean + (new_value - stats->mean) / (stats->count + 1);
-        float new_var = stats->var + ((new_value - stats->mean) * (new_value - new_mean) - stats->var) / (stats->count + 1);
-
-        stats->mean = new_mean;
-        stats->var = new_var;
-        stats->count += 1;
+        return head;
     }
 
     void updateThreshold()
     {   
-        // find the intersectionbetween the two gaussians
-        float a = 1.0 / (2.0 * total_stats.var) - 1.0 / (2.0 * trigger_stats.var);
-        float b = trigger_stats.mean/trigger_stats.var - total_stats.mean/total_stats.var;
-        float c = pow(total_stats.mean,2) /(2*total_stats.var) - pow(trigger_stats.mean, 2)/ (2*trigger_stats.var) - log(std::sqrt(trigger_stats.var)/std::sqrt(total_stats.var));
-    
-        float x1 = (-b + std::sqrt(pow(b, 2) - 4.0 * a * c)) / (2.0 * a);
-        float x2 = (-b - std::sqrt(pow(b, 2) - 4.0 * a * c)) / (2.0 * a);
+        std::sort(trigger_rates.begin(), trigger_rates.end());
+        std::sort(rest_rates.begin(), rest_rates.end());
+        
+        float min_loss = std::numeric_limits<float>::infinity();
+        float min_val = -1.0;
+        float max_search = 100000, min_search=100;
 
-        if(x1 < trigger_stats.mean && x1 > total_stats.mean)
+        if(!trigger_rates.empty())
         {
-            T = x1 / k;
+            max_search = trigger_rates.back();
         }
-        else if(x2 < trigger_stats.mean && x2 > total_stats.mean)
+        if(!rest_rates.empty())
         {
-            T = x2 / k;
+            min_search = rest_rates.front();
         }
-        else
+        
+        // 100 is the hardcoded number of thresholds to test
+        // TODO make configurable
+        // more values should give better result at the cost of longer computation
+        float search_step = max_search / 100;
+        
+        for(float i=min_search; i<max_search; i+=search_step){
+            float loss = thresholdLoss(i);
+            if(loss < min_loss)
+            {
+                min_loss = loss;
+                min_val = i;
+            }
+        }
+        if(min_val > 0.0)
+            T = min_val / k;
+
+        min_loss = 0;
+
+    }
+
+    float thresholdLoss(int threshold, float w=0.5)
+    {   
+        int n_missed = 0, n_false = 0;
+        float loss = 0.0;
+
+        if(!trigger_rates.empty())
         {
-            yInfo() << "Error in the threshold calculation";
+            auto upper_t = std::upper_bound(trigger_rates.begin(), trigger_rates.end(), threshold);
+            n_missed = std::distance(trigger_rates.begin(), upper_t);
         }
 
-        yInfo() << "New thresh: " << T * k;
+        if(!rest_rates.empty())
+        {
+            auto upper_r = std::upper_bound(rest_rates.begin(), rest_rates.end(), threshold);
+            n_false = std::distance(upper_r, rest_rates.end());
+        }
+         
+        if(!trigger_rates.empty()){
+            loss += ((float)n_missed / (float)trigger_rates.size()) * (1.0 - w);
+            loss += ((float)threshold / (float)trigger_rates.back()) * 0.05;
+        }
+        if(! rest_rates.empty()){
+            loss += ((float)n_false / (float)rest_rates.size()) * w;
+        }
+
+        return loss;
     }
 
     // synchronous thread
