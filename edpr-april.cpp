@@ -129,6 +129,7 @@ private:
     std::thread asynch_thread;
     std::thread asynch_thread_detection;
     ev::window<ev::AE> input_events;
+    
 
     // detection handlers
     externalDetector mn_handler;
@@ -198,6 +199,7 @@ public:
             yError() << "Could not open events input port";
             return false;
         }
+        
 
         // =====READ PARAMETERS=====
         movenet = rf.check("movenet") && rf.check("movenet", Value(true)).asBool();
@@ -226,6 +228,7 @@ public:
 
         // pltDet = true;
         pltTra = true;
+        
 
         // ===== SELECT VELOCITY ESTIMATION METHOD =====
         std::string method = rf.check("ve", Value("")).asString();
