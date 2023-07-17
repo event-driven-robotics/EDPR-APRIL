@@ -1,6 +1,6 @@
 
 # base image
-FROM nvidia/cuda:11.5.1-cudnn8-devel-ubuntu20.04
+FROM nvidia/cuda:11.5.2-cudnn8-devel-ubuntu20.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -43,26 +43,6 @@ RUN apt install -y libopencv-dev python3-opencv
 # install additional openpose dependencies
 
 #libhdf5-dev libatlas-base-dev
-
-
-######################
-# set github ssh keys #
-#######################
-
-ARG ssh_prv_key
-ARG ssh_pub_key  
-
-# Authorize SSH Host
-RUN mkdir -p /root/.ssh && \
-    chmod 0700 /root/.ssh
-RUN ssh-keyscan github.com > /root/.ssh/known_hosts
-
-# Add the keys and set permissions
-RUN echo "$ssh_prv_key" > /root/.ssh/id_ed25519 && \
-    echo "$ssh_pub_key" > /root/.ssh/id_ed25519.pub && \
-    chmod 600 /root/.ssh/id_ed25519 && \
-    chmod 600 /root/.ssh/id_ed25519.pub
-
 
 ###############
 # NEUROMORHPIC CAMERA DRIVER #
@@ -164,7 +144,6 @@ ENV PYTHONPATH "${PYTHONPATH}:$SOURCE_FOLDER/hpe-core"
 #ENV PYTHONPATH "${PYTHONPATH}:$SOURCE_FOLDER/hpe-core/example/movenet"
 
 # APRIL application
-RUN ssh-keyscan github.com > /root/.ssh/known_hosts
 RUN cd $SOURCE_FOLDER && \
     git clone --branch main git@github.com:event-driven-robotics/EDPR-APRIL.git && \
     cd EDPR-APRIL && mkdir build && cd build && \

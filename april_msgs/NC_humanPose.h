@@ -5,14 +5,14 @@
 
 // This is an automatically generated file.
 
-// Generated from the following "Vjxoutput" msg definition:
+// Generated from the following "NC_humanPose" msg definition:
 //   float64 timestamp
 //   float64[] pose
 //   float64[] velocity// Instances of this class can be read and written with YARP ports,
 // using a ROS-compatible format.
 
-#ifndef YARP_ROSMSG_Vjxoutput_h
-#define YARP_ROSMSG_Vjxoutput_h
+#ifndef YARP_ROSMSG_NC_humanPose_h
+#define YARP_ROSMSG_NC_humanPose_h
 
 #include <yarp/os/Wire.h>
 #include <yarp/os/Type.h>
@@ -23,14 +23,14 @@
 namespace yarp {
 namespace rosmsg {
 
-class Vjxoutput : public yarp::os::idl::WirePortable
+class NC_humanPose : public yarp::os::idl::WirePortable
 {
 public:
     yarp::conf::float64_t timestamp;
     std::vector<yarp::conf::float64_t> pose;
     std::vector<yarp::conf::float64_t> velocity;
 
-    Vjxoutput() :
+    NC_humanPose() :
             timestamp(0.0),
             pose(),
             velocity()
@@ -168,11 +168,11 @@ public:
 
     // This class will serialize ROS style or YARP style depending on protocol.
     // If you need to force a serialization style, use one of these classes:
-    typedef yarp::os::idl::BareStyle<yarp::rosmsg::Vjxoutput> rosStyle;
-    typedef yarp::os::idl::BottleStyle<yarp::rosmsg::Vjxoutput> bottleStyle;
+    typedef yarp::os::idl::BareStyle<yarp::rosmsg::NC_humanPose> rosStyle;
+    typedef yarp::os::idl::BottleStyle<yarp::rosmsg::NC_humanPose> bottleStyle;
 
     // The name for this message, ROS will need this
-    static constexpr const char* typeName = "Vjxoutput";
+    static constexpr const char* typeName = "NC_humanPose";
 
     // The checksum for this message, ROS will need this
     static constexpr const char* typeChecksum = "f60fac524517d870dbaac768aeafa188";
@@ -196,4 +196,4 @@ float64[] velocity\n\
 } // namespace rosmsg
 } // namespace yarp
 
-#endif // YARP_ROSMSG_Vjxoutput_h
+#endif // YARP_ROSMSG_NC_humanPose_h
