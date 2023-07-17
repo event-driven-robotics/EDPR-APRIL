@@ -8,6 +8,8 @@ find_package(YARP COMPONENTS os sig cv REQUIRED)
 find_package(hpe-core REQUIRED)
 find_package(event-driven REQUIRED)
 
+add_subdirectory(fault_button/cpp)
+
 # final isaac application
 add_executable(${PROJECT_NAME} ${PROJECT_NAME}.cpp)
 target_link_libraries(${PROJECT_NAME} YARP::YARP_OS 
@@ -16,7 +18,6 @@ target_link_libraries(${PROJECT_NAME} YARP::YARP_OS
                                       ev::event-driven
                                       hpe-core::hpe-core)
 
-
 #render single
 add_executable(velocity_grid velocity_grid.cpp)
 target_link_libraries(velocity_grid YARP::YARP_OS 
@@ -24,6 +25,5 @@ target_link_libraries(velocity_grid YARP::YARP_OS
                                       YARP::YARP_cv
                                       ev::event-driven
                                       hpe-core::hpe-core)
-
 
 install(TARGETS ${PROJECT_NAME} velocity_grid DESTINATION ${CMAKE_INSTALL_BINDIR})
