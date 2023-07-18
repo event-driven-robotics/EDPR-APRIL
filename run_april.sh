@@ -30,4 +30,6 @@ yarpserver --ros &
 echo "Run ATIS-bridge"
 atis-bridge-sdk --s 60 --filter 0.01 &
 echo "Run EDPR-APRIL application"
-edpr-april --thF 30  --detF 10 --movenet --gpu --ve pxt --ros
+edpr-april --thF 30  --detF 10 --movenet --gpu --ve pxt --ros &
+echo "Run Visual Fault Button application"
+visual-fault-button &

@@ -1,5 +1,3 @@
-# requires minimum cmake version
-cmake_minimum_required(VERSION 3.16.0)
 
 # produce the cmake var PROJECT_NAME
 project(visual-fault-button)

@@ -35,11 +35,17 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 :bulb: use `-v <local_dir>:<container_dir>` to mount further folders inside the container in order to transfer data between your local machine and the container, if needed.
 
 - At the terminal inside the container run the following command to execute a script that will set up a yarpserver connected to ROS, run the atis-bridge to get the events from the camera and finally run the HPE application with a visualisation window. The application should automatically connect to required input and output YARP modules. This script also sets the value to the env variable `ROS_MASTER_URI`. It is either set to the default valaue (i.e. `http://127.0.0.1:11311`) using the `-d` flag, or manually set to a differnet value using the flag `-m`.
-  ```shell 
-  $ ./run_april [-d (default)] or [-m value (manual)]
-  ```
+  
+```shell 
+$ ./run_april [-d (default)] or [-m value (manual)]
+```
+To stop the application itself, the camera and the yarpserver, the following command should be run in a temrinal inside the docker:
 
+```shell 
+$ ./kill_april
+```
 
+### human pose estimation: edpr-april
 - The application should run with default parameters, using moveEnet detector at 10 Hz, without the latency compensation.
 
 - While the visualisation window is selected:
@@ -59,7 +65,7 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
   - `--velpath  <STRING>` to save a `.csv` of joint velocities at a provided file location
   - `--v <STRING>` to save a video at a provided file location
 
-To stop the application itself, the camera and the yarpserver, the follwoing command should be run in a temrinal inside the docker:
-```shell 
-$ ./kill_april
-```
+### emergency safety: visual-fault-button
+
+The emergency fault button runs without arguments and has an interactive calibration procedure to set correct parameters for the environment and scenario. Follow onscreen prompts to start, calibration and run the neuromorphic visual fault button.
+

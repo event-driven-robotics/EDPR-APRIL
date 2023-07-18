@@ -447,6 +447,7 @@ public:
         output_video.release();
         asynch_thread.join();
         asynch_thread_detection.join();
+        int r = system("killall python3");
         return true;
     }
 
