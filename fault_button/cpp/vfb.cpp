@@ -8,6 +8,7 @@ Author: Arren Glover
 #include <math.h>
 #include <vector>
 #include <string>
+#include "../../april_msgs/Emergency.h"
 
 using std::vector;
 using yarp::os::Value;
@@ -25,7 +26,8 @@ private:
     //parameters
     double k{0.01};       // seconds in window
     double p{0.01};      // detection rate
-    double T{2e6};       // threshold events/second
+    double T{5e5};       // threshold events/second
+    double initT{5e5};
 
     enum state_name{DISPLAY, FBR_DRAW, MONITOR, FINISHED};
     state_name state{DISPLAY};
@@ -63,6 +65,12 @@ private:
     bool autoThresh{true};
     bool button_pressed{false};
 
+    // ros 
+    yarp::os::Node* ros_node{nullptr};
+    yarp::os::Publisher<yarp::rosmsg::Emergency> ros_publisher;
+    yarp::rosmsg::Emergency ros_output;
+    //ros_output.emergency_label = "visual_fault_button_triggered";
+
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
     {
@@ -83,11 +91,17 @@ public:
             return false;
         }
 
+        //ros interface
+        ros_node = new yarp::os::Node("/APRIL");
+        if(!ros_publisher.topic("/sim/visualFaultButton/trigger"))
+            yWarning() << "Could not open ROS publisher - messages will not be sent to ros";
+
         // =====READ PARAMETERS=====
 
         k = rf.check("k", Value(0.01)).asFloat64();
         p = rf.check("p", Value(0.01)).asFloat64();
-        T = rf.check("T", Value(5e5)).asFloat64();
+        initT = rf.check("T", Value(5e5)).asFloat64();
+        T = initT;
         buffer_time = rf.check("b", Value(1.0)).asFloat64();
 
         // ===== TRY DEFAULT CONNECTIONS =====
@@ -159,7 +173,8 @@ public:
             img.at<cv::Vec3b>(v.y, v.x) = {128, 128, 128};
         
         cv::Mat img_display; img.copyTo(img_display);
-        cv::putText(img_display, "Press SPACE when environment is clear", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "Press SPACE to begin", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "Calibrating: Fault Button Position and Region", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
 
         cv::imshow(getName(), img_display);
         char c = cv::waitKey(1);
@@ -179,7 +194,11 @@ public:
         cv::circle(img_display, c_fbr.c, c_fbr.r, {120, 10, 10}, -1);
         cv::circle(img_display, c_fbr.c, c_fbr.r, {255, 0, 0}, 4);
 
-        cv::putText(img_display, "DRAW Fault Region. Click and drag. " + std::to_string(c_fbr.r), cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "Calibrating: Fault Button Position and Region", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "DRAW Fault Region:", cv::Point(img_size.width*0.05, img_size.height*0.80), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "1. click and hold on fault button position", cv::Point(img_size.width*0.05, img_size.height*0.85), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "2. drag to form the region size and release", cv::Point(img_size.width*0.05, img_size.height*0.9), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "3. repeat if needed. press space when finished", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
 
         cv::imshow(getName(), img_display);
         char c = cv::waitKey(1);
@@ -210,7 +229,8 @@ public:
                 img.at<cv::Vec3b>(v.y, v.x) = {128, 128, 128};
             }
         }
-        // change displayed events color no notify a trigger
+
+        // change displayed events color to notify a trigger
         if(count > T * k && trig_buffer.count >= 0){
             cv::circle(img, c_fbr.c, c_fbr.r, {0, 0, 255}, 6);
             for(auto &v : input_events) {
@@ -218,12 +238,26 @@ public:
                     img.at<cv::Vec3b>(v.y, v.x) = {0, 0, 200};
                 }
             }
+            if(!autoThresh) {
+                yarp::rosmsg::Emergency &rosmessage = ros_publisher.prepare();
+                rosmessage.emergency_label = "visual_fault_button_triggered";
+                ros_publisher.write();
+            }
         }
+
         // show
-        cv::putText(img, "Monitoring Visual Fault Button", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        if(autoThresh) {
+            cv::putText(img, "Calibrating Threshold", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+            cv::putText(img, "Attention: press space each time the fault button is pressed", cv::Point(img_size.width*0.05, img_size.height*0.9), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+            cv::putText(img, "press (a) to use current threshold | press (r) to reset threshold", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        } else {
+            cv::putText(img, "Monitoring Visual Fault Button", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+            cv::putText(img, "ROS emergency message enabled", cv::Point(img_size.width*0.05, img_size.height*0.9), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+            cv::putText(img, "press (a) to enter threshold calibration mode", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        }
         cv::putText(img, "Current rate: " + std::to_string(count), cv::Point(img_size.width*0.05, img_size.height*0.10), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img, "Current threshold: " + std::to_string(T * k), cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img, "count: " + std::to_string(trig_buffer.count), cv::Point(img_size.width*0.05, img_size.height*0.15), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img, "Current threshold: " + std::to_string(T * k), cv::Point(img_size.width*0.05, img_size.height*0.15), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        //cv::putText(img, "count: " + std::to_string(trig_buffer.count), cv::Point(img_size.width*0.05, img_size.height*0.15), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         cv::imshow(getName(), img);
         char c = cv::waitKey(1);
         // handle button presses
@@ -231,17 +265,18 @@ public:
             state = FINISHED;
         else if(c == ' ') {
             // space represent a button press
-            yInfo() << "button pressed";
             button_pressed = true;
         }
         else if(c == 'a')
         {   
             // disable / enabele automatic threshold
             autoThresh = !autoThresh;
-            if(autoThresh)
-                yInfo() << "automatic threhsold enabled";
-            else
-                yInfo() << "automatic threhsold disabed";
+        } else if(c == 'r') {
+            if(autoThresh) {
+                T = initT;
+                rest_rates.clear();
+                trigger_rates.clear();
+            }
         }
 
         if(autoThresh)
@@ -399,8 +434,6 @@ int main(int argc, char *argv[])
     yarp::os::ResourceFinder rf;
     rf.setVerbose(false);
     rf.configure(argc, argv);
-
-    yInfo() << "I started";
 
     /* create the module */
     vbfApp instance;
