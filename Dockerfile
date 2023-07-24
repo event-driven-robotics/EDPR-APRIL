@@ -127,7 +127,7 @@ RUN cd $SOURCE_FOLDER && \
     
 # install hpe-core
 RUN cd $SOURCE_FOLDER && \
-    git clone --depth 1 --branch $HPE_VERSION git@github.com:event-driven-robotics/hpe-core.git &&\
+    git clone --depth 1 --branch $HPE_VERSION https://github.com/event-driven-robotics/hpe-core.git &&\
     cd hpe-core/core && mkdir build && cd build && \
     cmake .. && make install -j$(nproc)
 
@@ -145,7 +145,7 @@ ENV PYTHONPATH "${PYTHONPATH}:$SOURCE_FOLDER/hpe-core"
 
 # APRIL application
 RUN cd $SOURCE_FOLDER && \
-    git clone --branch main git@github.com:event-driven-robotics/EDPR-APRIL.git && \
+    git clone --branch main https://github.com/event-driven-robotics/EDPR-APRIL.git && \
     cd EDPR-APRIL && mkdir build && cd build && \
     cmake .. && make install -j$(nproc)
     
