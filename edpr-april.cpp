@@ -406,7 +406,7 @@ public:
             else
                 yInfo() << "ROS pose output publisher: OK";
 
-            if (!publisherPort_eros.topic("/pem/neuromorphic_camera/eros"))
+            if (!publisherPort_eros.topic("/isim/neuromorphic_camera/eros"))
             {
                 yError() << "Could not open ROS EROS output publisher";
                 return false;
@@ -414,7 +414,7 @@ public:
             else
                 yInfo() << "ROS EROS output publisher: OK";
 
-            if (!publisherPort_evs.topic("/pem/neuromorphic_camera/evs"))
+            if (!publisherPort_evs.topic("/isim/neuromorphic_camera/evs"))
             {
                 yError() << "Could not open ROS EVS output publisher";
                 return false;
