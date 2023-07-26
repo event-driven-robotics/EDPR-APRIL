@@ -19,8 +19,7 @@
 #include <string>
 #include <vector>
 
-namespace yarp {
-namespace rosmsg {
+namespace april_msgs {
 
 class Emergency : public yarp::os::idl::WirePortable
 {
@@ -105,8 +104,8 @@ public:
 
     // This class will serialize ROS style or YARP style depending on protocol.
     // If you need to force a serialization style, use one of these classes:
-    typedef yarp::os::idl::BareStyle<yarp::rosmsg::Emergency> rosStyle;
-    typedef yarp::os::idl::BottleStyle<yarp::rosmsg::Emergency> bottleStyle;
+    typedef yarp::os::idl::BareStyle<april_msgs::Emergency> rosStyle;
+    typedef yarp::os::idl::BottleStyle<april_msgs::Emergency> bottleStyle;
 
     // The name for this message, ROS will need this
     static constexpr const char* typeName = "Emergency";
@@ -128,7 +127,6 @@ string emergency_label\n\
     }
 };
 
-} // namespace rosmsg
-} // namespace yarp
+}
 
 #endif // YARP_ROSMSG_Emergency_h

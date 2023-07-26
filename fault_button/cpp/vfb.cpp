@@ -67,9 +67,7 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::Emergency> ros_publisher;
-    yarp::rosmsg::Emergency ros_output;
-    //ros_output.emergency_label = "visual_fault_button_triggered";
+    yarp::os::Publisher<april_msgs::Emergency> ros_publisher;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -239,7 +237,7 @@ public:
                 }
             }
             if(!autoThresh) {
-                yarp::rosmsg::Emergency &rosmessage = ros_publisher.prepare();
+                april_msgs::Emergency &rosmessage = ros_publisher.prepare();
                 rosmessage.emergency_label = "visual_fault_button_triggered";
                 ros_publisher.write();
             }

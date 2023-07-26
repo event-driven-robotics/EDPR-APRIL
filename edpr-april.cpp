@@ -12,7 +12,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
-#include "april_msgs/NC_humanPose.h"
+#include "april_msgs/NChumanPose.h"
 #include <yarp/rosmsg/sensor_msgs/Image.h>
 
 using namespace yarp::os;
@@ -150,7 +150,6 @@ private:
     // parameters
     int detF{10}, roiSize{20};
     bool alt_view{false}, pltVel{false}, pltDet{false}, pltTra{false};
-    bool vpx{false}, vsf{false}, ver{false}, vcr{false}, vqu{false}, vtr{false}, pxt{false}, noVE{false};
     bool latency_compensation{true};
     double scaler{1.0};
     double th_period{0.01}, thF{100.0};
@@ -164,8 +163,8 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::NC_humanPose> ros_publisher;
-    yarp::rosmsg::NC_humanPose ros_output;
+    yarp::os::Publisher<yarp::rosmsg::NChumanPose> ros_publisher;
+    yarp::rosmsg::NChumanPose ros_output;
     typedef yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ImageTopicType;
     ImageTopicType publisherPort_eros, publisherPort_evs;
 
@@ -207,12 +206,6 @@ public:
 
         // pltDet = true;
         pltTra = true;
-        
-
-        // ===== SELECT VELOCITY ESTIMATION METHOD =====
-        std::string method = rf.check("ve", Value("")).asString();
-        pxt = true;
-        scaler = 1.5;
         
 
         int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py --gpu &");
