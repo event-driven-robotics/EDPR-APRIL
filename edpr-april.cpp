@@ -12,7 +12,7 @@ Author: Franco Di Pietro, Arren Glover
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
-#include "april_msgs/NChumanPose.h"
+#include "april_msgs/yarp/rosmsg/april_msgs/NChumanPose.h"
 #include <yarp/rosmsg/sensor_msgs/Image.h>
 
 using namespace yarp::os;
@@ -163,8 +163,8 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::NChumanPose> ros_publisher;
-    yarp::rosmsg::NChumanPose ros_output;
+    yarp::os::Publisher<yarp::rosmsg::april_msgs::NChumanPose> ros_publisher;
+    yarp::rosmsg::april_msgs::NChumanPose ros_output;
     typedef yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ImageTopicType;
     ImageTopicType publisherPort_eros, publisherPort_evs;
 
@@ -334,6 +334,15 @@ public:
         if(pltRoi)
             drawROI(canvas);
 
+        // yarp::rosmsg::std_msgs::Header header;
+        // std::uint32_t height;
+        // std::uint32_t width;
+        // std::string encoding;
+        // std::uint8_t is_bigendian;
+        // std::uint32_t step;
+        // std::vector<std::uint8_t> data;
+
+        static int sequence = 0;
         // publish images using ROS
         // EROS
         static cv::Mat cvEROS = cv::Mat(image_size, CV_8UC3);
@@ -344,7 +353,14 @@ public:
         rosEROS.data.resize(yarpEROS.getRawImageSize());
         rosEROS.width = yarpEROS.width();
         rosEROS.height = yarpEROS.height();
+        rosEROS.encoding = "8UC1";
+        //rosEROS.is_bigendian = yarpEROS.is_bigendian;
+        //rosEROS.step = yarpEROS.step;
         memcpy(rosEROS.data.data(), yarpEROS.getRawImage(), yarpEROS.getRawImageSize());
+        rosEROS.header.seq = sequence;
+        rosEROS.header.frame_id = "";
+        rosEROS.header.stamp.sec = (int)(yarp::os::Time::now());
+        rosEROS.header.stamp.nsec = 0;
         publisherPort_eros.write();
         // EV image
         static cv::Mat cvEVS = cv::Mat(image_size, CV_8UC3);
@@ -355,8 +371,17 @@ public:
         rosEVS.data.resize(yarpEVS.getRawImageSize());
         rosEVS.width = yarpEVS.width();
         rosEVS.height = yarpEVS.height();
+        rosEVS.encoding = "8UC1";
+        //rosEVS.is_bigendian = yarpEVS.is_bigendian;
+        //rosEVS.step = yarpEVS.step;
         memcpy(rosEVS.data.data(), yarpEVS.getRawImage(), yarpEVS.getRawImageSize());
+        rosEVS.header.seq = sequence;
+        rosEVS.header.frame_id = "";
+        rosEVS.header.stamp.sec = (int)(yarp::os::Time::now());
+        rosEVS.header.stamp.nsec = 0;
         publisherPort_evs.write();
+
+        sequence++;
         
 
         vis_image.setTo(cv::Vec3b(0, 0, 0));
