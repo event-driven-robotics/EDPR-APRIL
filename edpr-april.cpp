@@ -254,17 +254,18 @@ public:
             return false;
         }
 
-        if (!publisherPort_eros.topic("/pem/neuromorphic_camera/eros"))
+        if (!publisherPort_eros.topic("/isim/neuromorphic_camera/eros"))
         {
             yError() << "Could not open ROS EROS output publisher";
             return false;
         }
 
-        if (!publisherPort_evs.topic("/pem/neuromorphic_camera/evs"))
+        if (!publisherPort_evs.topic("/isim/neuromorphic_camera/evs"))
         {
             yError() << "Could not open ROS EVS output publisher";
             return false;
         }
+        
 
         asynch_thread = std::thread([this]{ this->run_opixels(); });
         asynch_thread_detection = std::thread([this]{ this->run_detection(); });
