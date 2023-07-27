@@ -8,7 +8,8 @@ Author: Arren Glover
 #include <math.h>
 #include <vector>
 #include <string>
-#include "../../april_msgs/Emergency.h"
+#include <fstream>
+#include "../../april_msgs/yarp/rosmsg/april_msgs/Emergency.h"
 
 using std::vector;
 using yarp::os::Value;
@@ -67,9 +68,47 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::Emergency> ros_publisher;
-    yarp::rosmsg::Emergency ros_output;
-    //ros_output.emergency_label = "visual_fault_button_triggered";
+    yarp::os::Publisher<yarp::rosmsg::april_msgs::Emergency> ros_publisher;
+
+    bool loadCalibration(std::string calib_file_path)
+    {
+        yarp::os::ResourceFinder calib_reader;
+        calib_reader.setDefault("from", calib_file_path);
+        calib_reader.configure(0, 0);
+
+        yarp::os::Bottle &ps = calib_reader.findGroup("VISUAL_FAULT_BUTTON_CALIB");
+        if(ps.isNull()) return false;
+
+        c_fbr.c.x = ps.find("x").asInt32();
+        c_fbr.c.y = ps.find("y").asInt32();
+        c_fbr.r   = ps.find("r").asInt32();
+        T         = ps.find("T").asFloat64();
+
+        yInfo() << "Loaded parameters";
+        yInfo() << "[" << c_fbr.c.x << "," << c_fbr.c.y << "]@" << c_fbr.r << "pixels";
+        yInfo() << "Threshold:" << T;
+
+        return true;
+    }
+
+    bool saveCalibration(std::string calib_file_path)
+    {
+        std::ofstream writer;
+        writer.open(calib_file_path, std::ios_base::trunc);
+        if(!writer.is_open()) {
+            yError() << "could not save file (ensure path exists?):" << calib_file_path;
+            return false;
+        }
+        writer << "[VISUAL_FAULT_BUTTON_CALIB]" << std::endl;
+        writer << std::endl;
+        writer << "x " << c_fbr.c.x << std::endl;
+        writer << "y " << c_fbr.c.y << std::endl;
+        writer << "r " << c_fbr.r << std::endl;
+        writer << "T " << std::fixed << std::setprecision(3) << T << std::endl;
+        writer.flush();
+        writer.close();
+        return true;
+    }
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -103,14 +142,22 @@ public:
         initT = rf.check("T", Value(5e5)).asFloat64();
         T = initT;
         buffer_time = rf.check("b", Value(1.0)).asFloat64();
+        img = cv::Mat(img_size, CV_8UC3); img = 0;
+        mask = cv::Mat(img_size, CV_8U); mask = 0;
+
+        if(loadCalibration("calib_parameters.txt")) {
+            state=MONITOR;
+            autoThresh = false;
+            makeMask();
+        } else {
+            state=DISPLAY;
+        }
 
         // ===== TRY DEFAULT CONNECTIONS =====
         Network::connect("/file/ch0dvs:o",  getName("/AE:i"), "fast_tcp");
         Network::connect("/file/atis/AE:o", getName("/AE:i"), "fast_tcp");
         Network::connect("/atis3/AE:o",     getName("/AE:i"), "fast_tcp");
 
-        img = cv::Mat(img_size, CV_8UC3); img = 0;
-        mask = cv::Mat(img_size, CV_8U); mask = 0;
         cv::namedWindow(getName(),  cv::WINDOW_KEEPRATIO);
         cv::resizeWindow(getName(), {640, 480});
 
@@ -135,6 +182,7 @@ public:
     bool close() override
     {
         // when the asynchronous thread is asked to stop, close ports and do other clean up
+        saveCalibration("calib_parameters.txt");
         return true;
     }
 
@@ -239,7 +287,11 @@ public:
                 }
             }
             if(!autoThresh) {
-                yarp::rosmsg::Emergency &rosmessage = ros_publisher.prepare();
+                yarp::rosmsg::april_msgs::Emergency &rosmessage = ros_publisher.prepare();
+                rosmessage.header.seq = 0;
+                rosmessage.header.frame_id = "";
+                rosmessage.header.stamp.sec = (int)(yarp::os::Time::now());
+                rosmessage.header.stamp.nsec = 0;
                 rosmessage.emergency_label = "visual_fault_button_triggered";
                 ros_publisher.write();
             }
@@ -276,6 +328,7 @@ public:
                 T = initT;
                 rest_rates.clear();
                 trigger_rates.clear();
+                state=DISPLAY;
             }
         }
 
