@@ -353,9 +353,10 @@ public:
         rosEROS.data.resize(yarpEROS.getRawImageSize());
         rosEROS.width = yarpEROS.width();
         rosEROS.height = yarpEROS.height();
-        rosEROS.encoding = "8UC1";
+        rosEROS.encoding = "8UC3";
+        //cvEROS.is_bigendian
         //rosEROS.is_bigendian = yarpEROS.is_bigendian;
-        //rosEROS.step = yarpEROS.step;
+        //rosEROS.step = cvEROS.step;
         memcpy(rosEROS.data.data(), yarpEROS.getRawImage(), yarpEROS.getRawImageSize());
         rosEROS.header.seq = sequence;
         rosEROS.header.frame_id = "";
@@ -371,7 +372,7 @@ public:
         rosEVS.data.resize(yarpEVS.getRawImageSize());
         rosEVS.width = yarpEVS.width();
         rosEVS.height = yarpEVS.height();
-        rosEVS.encoding = "8UC1";
+        rosEVS.encoding = "8UC3";
         //rosEVS.is_bigendian = yarpEVS.is_bigendian;
         //rosEVS.step = yarpEVS.step;
         memcpy(rosEVS.data.data(), yarpEVS.getRawImage(), yarpEVS.getRawImageSize());
