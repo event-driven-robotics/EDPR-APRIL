@@ -342,7 +342,9 @@ public:
         // std::uint32_t step;
         // std::vector<std::uint8_t> data;
 
-        static int sequence = 0;
+        static yarp::os::Stamp ystamp;
+        ystamp.update();
+
         // publish images using ROS
         // EROS
         static cv::Mat cvEROS = cv::Mat(image_size, CV_8UC3);
@@ -353,37 +355,36 @@ public:
         rosEROS.data.resize(yarpEROS.getRawImageSize());
         rosEROS.width = yarpEROS.width();
         rosEROS.height = yarpEROS.height();
-        rosEROS.encoding = "8UC3";
-        //cvEROS.is_bigendian
-        //rosEROS.is_bigendian = yarpEROS.is_bigendian;
-        //rosEROS.step = cvEROS.step;
+        rosEROS.encoding = "8UC3";//yarp::dev::ROSPixelCode::yarp2RosPixelCode(yarpEROS.getPixelCode());
+        rosEROS.step = yarpEROS.getRowSize();
+        rosEROS.is_bigendian = 0;
+        rosEROS.header.frame_id = "eros";
+        rosEROS.header.seq = ystamp.getCount();
+        rosEROS.header.stamp = ystamp.getTime();
         memcpy(rosEROS.data.data(), yarpEROS.getRawImage(), yarpEROS.getRawImageSize());
-        rosEROS.header.seq = sequence;
-        rosEROS.header.frame_id = "";
-        rosEROS.header.stamp.sec = (int)(yarp::os::Time::now());
-        rosEROS.header.stamp.nsec = 0;
+        publisherPort_eros.setEnvelope(ystamp);
         publisherPort_eros.write();
+
         // EV image
         static cv::Mat cvEVS = cv::Mat(image_size, CV_8UC3);
         cvEVS.setTo(cv::Vec3b(0, 0, 0));
         vis_image.copyTo(cvEVS);
+
         auto yarpEVS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEVS);
         yarp::rosmsg::sensor_msgs::Image& rosEVS = publisherPort_evs.prepare();
         rosEVS.data.resize(yarpEVS.getRawImageSize());
         rosEVS.width = yarpEVS.width();
         rosEVS.height = yarpEVS.height();
-        rosEVS.encoding = "8UC3";
-        //rosEVS.is_bigendian = yarpEVS.is_bigendian;
-        //rosEVS.step = yarpEVS.step;
+        rosEVS.encoding = "8UC3";//yarp::dev::ROSPixelCode::yarp2RosPixelCode(yarpEVS.getPixelCode());
+        rosEVS.step = yarpEVS.getRowSize();
+        rosEVS.is_bigendian = 0;
+        rosEVS.header.frame_id = "eventimage";
+        rosEVS.header.seq = ystamp.getCount();
+        rosEVS.header.stamp = ystamp.getTime();
         memcpy(rosEVS.data.data(), yarpEVS.getRawImage(), yarpEVS.getRawImageSize());
-        rosEVS.header.seq = sequence;
-        rosEVS.header.frame_id = "";
-        rosEVS.header.stamp.sec = (int)(yarp::os::Time::now());
-        rosEVS.header.stamp.nsec = 0;
-        publisherPort_evs.write();
 
-        sequence++;
-        
+        publisherPort_evs.setEnvelope(ystamp);
+        publisherPort_evs.write();     
 
         vis_image.setTo(cv::Vec3b(0, 0, 0));
 
