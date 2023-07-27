@@ -5,44 +5,67 @@
 
 // This is an automatically generated file.
 
-// Generated from the following "Emergency" msg definition:
-//   string emergency_label
+// Generated from the following "std_msgs/Header" msg definition:
+//   uint32 seq
+//   time stamp
+//   string frame_id
 // Instances of this class can be read and written with YARP ports,
 // using a ROS-compatible format.
 
-#ifndef YARP_ROSMSG_Emergency_h
-#define YARP_ROSMSG_Emergency_h
+#ifndef YARP_ROSMSG_std_msgs_Header_h
+#define YARP_ROSMSG_std_msgs_Header_h
 
 #include <yarp/os/Wire.h>
 #include <yarp/os/Type.h>
 #include <yarp/os/idl/WireTypes.h>
 #include <string>
 #include <vector>
+#include <yarp/rosmsg/TickTime.h>
 
-namespace april_msgs {
+namespace yarp {
+namespace rosmsg {
+namespace std_msgs {
 
-class Emergency : public yarp::os::idl::WirePortable
+class Header : public yarp::os::idl::WirePortable
 {
 public:
-    std::string emergency_label;
+    std::uint32_t seq;
+    yarp::rosmsg::TickTime stamp;
+    std::string frame_id;
 
-    Emergency() :
-            emergency_label("")
+    Header() :
+            seq(0),
+            stamp(),
+            frame_id("")
     {
     }
 
     void clear()
     {
-        // *** emergency_label ***
-        emergency_label = "";
+        // *** seq ***
+        seq = 0;
+
+        // *** stamp ***
+        stamp.clear();
+
+        // *** frame_id ***
+        frame_id = "";
     }
 
     bool readBare(yarp::os::ConnectionReader& connection) override
     {
-        // *** emergency_label ***
+        // *** seq ***
+        seq = connection.expectInt32();
+
+        // *** stamp ***
+        if (!stamp.read(connection)) {
+            return false;
+        }
+
+        // *** frame_id ***
         int len = connection.expectInt32();
-        emergency_label.resize(len);
-        if (!connection.expectBlock((char*)emergency_label.c_str(), len)) {
+        frame_id.resize(len);
+        if (!connection.expectBlock((char*)frame_id.c_str(), len)) {
             return false;
         }
 
@@ -53,12 +76,20 @@ public:
     {
         connection.convertTextMode();
         yarp::os::idl::WireReader reader(connection);
-        if (!reader.readListHeader(1)) {
+        if (!reader.readListHeader(3)) {
             return false;
         }
 
-        // *** emergency_label ***
-        if (!reader.readString(emergency_label)) {
+        // *** seq ***
+        seq = reader.expectInt32();
+
+        // *** stamp ***
+        if (!stamp.read(connection)) {
+            return false;
+        }
+
+        // *** frame_id ***
+        if (!reader.readString(frame_id)) {
             return false;
         }
 
@@ -74,9 +105,17 @@ public:
 
     bool writeBare(yarp::os::ConnectionWriter& connection) const override
     {
-        // *** emergency_label ***
-        connection.appendInt32(emergency_label.length());
-        connection.appendExternalBlock((char*)emergency_label.c_str(), emergency_label.length());
+        // *** seq ***
+        connection.appendInt32(seq);
+
+        // *** stamp ***
+        if (!stamp.write(connection)) {
+            return false;
+        }
+
+        // *** frame_id ***
+        connection.appendInt32(frame_id.length());
+        connection.appendExternalBlock((char*)frame_id.c_str(), frame_id.length());
 
         return !connection.isError();
     }
@@ -84,12 +123,21 @@ public:
     bool writeBottle(yarp::os::ConnectionWriter& connection) const override
     {
         connection.appendInt32(BOTTLE_TAG_LIST);
-        connection.appendInt32(1);
+        connection.appendInt32(3);
 
-        // *** emergency_label ***
+        // *** seq ***
+        connection.appendInt32(BOTTLE_TAG_INT32);
+        connection.appendInt32(seq);
+
+        // *** stamp ***
+        if (!stamp.write(connection)) {
+            return false;
+        }
+
+        // *** frame_id ***
         connection.appendInt32(BOTTLE_TAG_STRING);
-        connection.appendInt32(emergency_label.length());
-        connection.appendExternalBlock((char*)emergency_label.c_str(), emergency_label.length());
+        connection.appendInt32(frame_id.length());
+        connection.appendExternalBlock((char*)frame_id.c_str(), frame_id.length());
 
         connection.convertTextMode();
         return !connection.isError();
@@ -104,18 +152,20 @@ public:
 
     // This class will serialize ROS style or YARP style depending on protocol.
     // If you need to force a serialization style, use one of these classes:
-    typedef yarp::os::idl::BareStyle<april_msgs::Emergency> rosStyle;
-    typedef yarp::os::idl::BottleStyle<april_msgs::Emergency> bottleStyle;
+    typedef yarp::os::idl::BareStyle<yarp::rosmsg::std_msgs::Header> rosStyle;
+    typedef yarp::os::idl::BottleStyle<yarp::rosmsg::std_msgs::Header> bottleStyle;
 
     // The name for this message, ROS will need this
-    static constexpr const char* typeName = "Emergency";
+    static constexpr const char* typeName = "std_msgs/Header";
 
     // The checksum for this message, ROS will need this
-    static constexpr const char* typeChecksum = "be0773c564beb804e77c237e3c2c40d5";
+    static constexpr const char* typeChecksum = "2176decaecbce78abc3b96ef049fabed";
 
     // The source text for this message, ROS will need this
     static constexpr const char* typeText = "\
-string emergency_label\n\
+uint32 seq\n\
+time stamp\n\
+string frame_id\n\
 ";
 
     yarp::os::Type getType() const override
@@ -127,6 +177,8 @@ string emergency_label\n\
     }
 };
 
-}
+} // namespace std_msgs
+} // namespace rosmsg
+} // namespace yarp
 
-#endif // YARP_ROSMSG_Emergency_h
+#endif // YARP_ROSMSG_std_msgs_Header_h

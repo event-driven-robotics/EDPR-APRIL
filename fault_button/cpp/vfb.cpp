@@ -8,7 +8,7 @@ Author: Arren Glover
 #include <math.h>
 #include <vector>
 #include <string>
-#include "../../april_msgs/Emergency.h"
+#include "../../april_msgs/yarp/rosmsg/april_msgs/Emergency.h"
 
 using std::vector;
 using yarp::os::Value;
@@ -67,7 +67,7 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<april_msgs::Emergency> ros_publisher;
+    yarp::os::Publisher<yarp::rosmsg::april_msgs::Emergency> ros_publisher;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -237,7 +237,11 @@ public:
                 }
             }
             if(!autoThresh) {
-                april_msgs::Emergency &rosmessage = ros_publisher.prepare();
+                yarp::rosmsg::april_msgs::Emergency &rosmessage = ros_publisher.prepare();
+                rosmessage.header.seq = 0;
+                rosmessage.header.frame_id = "";
+                rosmessage.header.stamp.sec = (int)(yarp::os::Time::now());
+                rosmessage.header.stamp.nsec = 0;
                 rosmessage.emergency_label = "visual_fault_button_triggered";
                 ros_publisher.write();
             }
