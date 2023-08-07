@@ -47,13 +47,15 @@ public:
         input_port.close();
     }
 
-    bool update(cv::Mat latest_image, double latest_ts, hpecore::stampedPose &previous_skeleton)
+    bool update(const cv::Mat &latest_image, double latest_ts, hpecore::stampedPose &previous_skeleton)
     {
         // send an update if the timer has elapsed
+        if(latest_ts < tic) tic = latest_ts - 2.0;
         if ((!waiting && latest_ts - tic > period) || (latest_ts - tic > 2.0))
         {
             static cv::Mat cv_image;
-            cv::GaussianBlur(latest_image, cv_image, cv::Size(5, 5), 0, 0);
+            latest_image.convertTo(cv_image, CV_8U);
+            cv::GaussianBlur(cv_image, cv_image, cv::Size(5, 5), 0, 0);
             output_port.prepare().copy(yarp::cv::fromCvMat<PixelMono>(cv_image));
             output_port.write();
             tic = latest_ts;
@@ -140,6 +142,7 @@ private:
     hpecore::BIN binary_handler;
 
     // velocity and fusion
+    hpecore::pwtripletvelocity velocity_estimator;
     hpecore::pwTripletVelocity pw_trip_velocity;
     hpecore::multiJointLatComp state;
 
@@ -196,10 +199,10 @@ public:
         pltDet = rf.check("pltDet") && rf.check("pltDet", Value(true)).asBool();
         pltTra = rf.check("pltTra") && rf.check("pltTra", Value(true)).asBool();
         pltRoi = rf.check("pr") && rf.check("pr", Value(true)).asBool();
-        detF = rf.check("detF", Value(10)).asInt32();
+        detF = rf.check("detF", Value(1)).asInt32();
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
-        roiSize = rf.check("roi", Value(20)).asInt32();
+        roiSize = rf.check("roi", Value(26)).asInt32();
         double procU = rf.check("pu", Value(1e-1)).asFloat64();
         double measUD = rf.check("muD", Value(1e-4)).asFloat64();
         double measUV = rf.check("muV", Value(0)).asFloat64();
@@ -274,7 +277,7 @@ public:
         }
         
         camera_handler_thread = std::thread([this]{ this->run_camera_interface(); });
-        //hpe_thread = std::thread([this]{ this->run_detection(); });
+        hpe_thread = std::thread([this]{ this->run_hpe(); });
 
         return true;
     }
@@ -292,7 +295,7 @@ public:
         input_events.stop();
         mn_handler.close();
         camera_handler_thread.join();
-        //hpe_thread.join();
+        hpe_thread.join();
         int r = system("killall python3");
         return true;
     }
@@ -337,8 +340,8 @@ public:
         {
             float cx = state.query()[i].u;
             float cy = state.query()[i].v;
-            cv::Point2d p1(cx-roiSize/2, cy-roiSize/2);
-            cv::Point2d p2(cx+roiSize/2, cy+roiSize/2);
+            cv::Point2d p1(cx-roiSize, cy-roiSize);
+            cv::Point2d p2(cx+roiSize, cy+roiSize);
             cv::rectangle(img, cv::Rect(p1, p2), colors[i], 1);
             
         }
@@ -359,8 +362,8 @@ public:
         else if(alt_view == 2)
             drawSAE(canvas);
 
-        if(pltRoi)
-            drawROI(canvas);
+        //if(pltRoi)
+        drawROI(canvas);
 
         // yarp::rosmsg::std_msgs::Header header;
         // std::uint32_t height;
@@ -424,8 +427,8 @@ public:
         if (pltVel)
         {
             hpecore::skeleton13_vel jv = state.queryVelocity();
-            for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
-                jv[j] = jv[j] * 0.1;
+            //for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
+             //   jv[j] = jv[j] * 0.1;
 
             hpecore::drawVel(canvas, state.query(), jv, {255, 255, 102}, 2);
         }
@@ -500,6 +503,8 @@ public:
                 sae_handler.getSurface().setTo(0.0);
                 binary_handler.getSurface().setTo(0.0);
                 eros_handler.getSurface().setTo(0.0);
+                state.reset();
+                velocity_estimator.prev_update_ts = 0;
             }
             pts = tnow;
 
@@ -515,7 +520,35 @@ public:
     void run_hpe()
     {
 
+        while(!isStopping()) {
+            //detection
+            hpecore::stampedPose detected_pose;
+            bool was_detected = mn_handler.update(eros_handler.getSurface(), tnow, detected_pose);
+            if (was_detected && hpecore::poseNonZero(detected_pose.pose))
+            {
+                skeleton_detection = detected_pose.pose;
+                //latency = detected_pose.delay;
+                if (state.poseIsInitialised())
+                    state.updateFromPosition(skeleton_detection, detected_pose.timestamp);
+                else
+                    state.set(skeleton_detection, tnow);
+            }
 
+            
+            if (!state.poseIsInitialised())
+               continue;
+
+            //velocity
+            auto jvs = velocity_estimator.multi_area_velocity(sae_handler.getSurface(), tnow, state.query(), roiSize);
+            state.setVelocity(jvs);
+            state.updateFromVelocity(jvs, tnow);
+            //hpecore::print_skeleton<hpecore::skeleton13>(jvs);
+
+            yarp::os::Time::delay(0.01);
+
+
+
+        }
 
     }
 
