@@ -202,7 +202,7 @@ public:
         detF = rf.check("detF", Value(1)).asInt32();
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
-        roiSize = rf.check("roi", Value(26)).asInt32();
+        roiSize = rf.check("roi", Value(20)).asInt32();
         double procU = rf.check("pu", Value(1e-1)).asFloat64();
         double measUD = rf.check("muD", Value(1e-4)).asFloat64();
         double measUV = rf.check("muV", Value(0)).asFloat64();
@@ -362,17 +362,6 @@ public:
         else if(alt_view == 2)
             drawSAE(canvas);
 
-        //if(pltRoi)
-        drawROI(canvas);
-
-        // yarp::rosmsg::std_msgs::Header header;
-        // std::uint32_t height;
-        // std::uint32_t width;
-        // std::string encoding;
-        // std::uint8_t is_bigendian;
-        // std::uint32_t step;
-        // std::vector<std::uint8_t> data;
-
         static yarp::os::Stamp ystamp;
         ystamp.update();
 
@@ -419,19 +408,11 @@ public:
         binary_handler.getSurface().setTo(0.0);
 
         // plot skeletons
-        if (pltDet)
-            hpecore::drawSkeleton(canvas, skeleton_detection, {255, 0, 0}, 3);
-        if (pltTra)
-            hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
+        hpecore::drawSkeleton(canvas, skeleton_detection, {255, 0, 0}, 3);
+        hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
 
-        if (pltVel)
-        {
-            hpecore::skeleton13_vel jv = state.queryVelocity();
-            //for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
-             //   jv[j] = jv[j] * 0.1;
+        hpecore::drawVel(canvas, skeleton_detection, state.queryVelocity(), {255, 255, 102}, 2);
 
-            hpecore::drawVel(canvas, state.query(), jv, {255, 255, 102}, 2);
-        }
 
         if (!edpr_logo.empty())
         {
@@ -443,14 +424,6 @@ public:
         std::stringstream ss;
         ss << std::fixed << std::setprecision(1) << scaler;
         std::string mystring = ss.str();
-
-        // cv::putText(canvas, //target image
-        //     mystring, //text
-        //     cv::Point(canvas.cols - 60, canvas.rows - 30), //top-left position
-        //     cv::FONT_HERSHEY_DUPLEX,
-        //     0.6,
-        //     CV_RGB(150, 150, 150), //font color
-        //     2);
 
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
@@ -542,12 +515,6 @@ public:
             auto jvs = velocity_estimator.multi_area_velocity(sae_handler.getSurface(), tnow, state.query(), roiSize);
             state.setVelocity(jvs);
             state.updateFromVelocity(jvs, tnow);
-            //hpecore::print_skeleton<hpecore::skeleton13>(jvs);
-
-            yarp::os::Time::delay(0.01);
-
-
-
         }
 
     }
