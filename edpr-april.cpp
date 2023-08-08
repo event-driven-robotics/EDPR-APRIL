@@ -415,7 +415,7 @@ public:
         hpecore::drawSkeleton(canvas, skeleton_detection, {255, 0, 0}, 3);
         hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
 
-        hpecore::drawVel(canvas, skeleton_detection, state.queryVelocity(), {255, 255, 102}, 2);
+        hpecore::drawVel(canvas, skeleton_detection, state.queryDP(), {255, 255, 102}, 2);
 
 
         if (!edpr_logo.empty())
