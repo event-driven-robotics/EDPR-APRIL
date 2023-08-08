@@ -174,6 +174,7 @@ private:
     yarp::rosmsg::april_msgs::NChumanPose ros_output;
     typedef yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ImageTopicType;
     ImageTopicType publisherPort_eros, publisherPort_evs;
+    int counter{0};
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -350,6 +351,9 @@ public:
     // synchronous thread
     bool updateModule() override
     {
+        //yInfo() << (int)(counter/th_period) << "Hz";
+        counter = 0;
+
         static cv::Mat canvas = cv::Mat(image_size, CV_8UC3);
         canvas.setTo(cv::Vec3b(0, 0, 0));
 
@@ -492,7 +496,6 @@ public:
 
     void run_hpe()
     {
-
         while(!isStopping()) {
             //detection
             hpecore::stampedPose detected_pose;
@@ -515,113 +518,30 @@ public:
             auto jvs = velocity_estimator.multi_area_velocity(sae_handler.getSurface(), tnow, state.query(), roiSize);
             state.setVelocity(jvs);
             state.updateFromVelocity(jvs, tnow);
+            counter++;
+
+
+            //send to ros as fast as possible
+            static double timer = yarp::os::Time::now();
+            double dt = yarp::os::Time::now() - timer;
+            if (dt > 0.01) {
+                timer += dt;
+                auto &ros_output = ros_publisher.prepare();
+                hpecore::skeleton13 pos = state.query();
+                hpecore::skeleton13 vel = state.queryVelocity();
+                ros_output.pose.resize(pos.size()*2);
+                ros_output.velocity.resize(vel.size()*2);
+                for (int j = 0; j < pos.size(); j++) {
+                    ros_output.pose[j * 2] = pos[j].u;
+                    ros_output.pose[j * 2 + 1] = pos[j].v;
+                    ros_output.velocity[j * 2] = vel[j].u;
+                    ros_output.velocity[j * 2 + 1] = vel[j].v;
+                }
+                ros_output.timestamp = tnow;
+                ros_publisher.write();
+            }
         }
-
     }
-
-    // void run_detection()
-    // {
-    //     double latency = 0.0;
-    //     hpecore::stampedPose detected_pose;
-    //     double t0 = Time::now();
-    //     std:vector<double> sklt_out; 
-
-    //     while (!isStopping())
-    //     {
-    //         tnow = Time::now() - t0;
-
-    //         // ---------- DETECTIONS ----------
-    //         bool was_detected = false;
-    //         static cv::Mat eros8;
-    //         pw_trip_velocity.queryEROS().convertTo(eros8, CV_8U, 255);
-    //         was_detected = mn_handler.update(eros8, tnow, detected_pose);
-            
-
-    //         if (was_detected && hpecore::poseNonZero(detected_pose.pose))
-    //         {
-    //             skeleton_detection = detected_pose.pose;
-    //             latency = detected_pose.delay;
-    //             if (state.poseIsInitialised())
-    //                 state.updateFromPosition(skeleton_detection, detected_pose.timestamp);
-    //             else
-    //                 state.set(skeleton_detection, tnow);
-    //         }
-    //     }
-    // }
-
-    // void run_opixels()
-    // {
-    //     hpecore::skeleton13_vel jv;
-    //     hpecore::skeleton13_vel skel_vel = {0};
-    //     ev::info event_stats = {0};
-    //     double latency = 0.0;
-    //     hpecore::stampedPose detected_pose;
-    //     input_events.readPacket(true);
-    //     double t0 = Time::now();
-    //     std:vector<double> sklt_out, vel_out;
-    //     double t1, t2, dt;
-    //     double ts0;
-
-    //     while (!isStopping())
-    //     {
-    //         double tnow = Time::now() - t0;
-
-    //         // ---------- VELOCITY ----------
-    //         // read events
-    //         event_stats = input_events.readAll(false);
-    //         if (event_stats.count == 0)
-    //             continue;
-
-    //         if(!started)
-    //         {
-    //             started = true;
-    //             ts0 = event_stats.timestamp;
-    //         } 
-
-    //         // update images
-    //         for (auto &v : input_events)
-    //         {
-    //             vis_image.at<cv::Vec3b>(v.y, v.x) = cv::Vec3b(255, 255, 255);
-    //         }
-
-    //         t1 = Time::now();
-                       
-
-    //         // only update velocity if the pose is initialised
-    //         if (!state.poseIsInitialised())
-    //             continue;
-
-    //         pw_trip_velocity.updateSAE(input_events.begin(), input_events.end(), event_stats.timestamp-ts0); 
-    //         skel_vel = pw_trip_velocity.query(state.query(), event_stats.timestamp-ts0, roiSize, 1);
-            
-            
-    //         for (int j = 0; j < 13; j++) // (F) overload * to skeleton13
-    //             skel_vel[j] = skel_vel[j] * scaler;
-    //         state.setVelocity(skel_vel);
-    //         state.updateFromVelocity(skel_vel, event_stats.timestamp);
-
-    //         t2 = Time::now();
-    //         dt = (t2 - t1) * 1e3;
-
-
-    //         sklt_out.clear();
-    //         vel_out.clear();
-    //         for (int j = 0; j < 13; j++)
-    //         {
-    //             sklt_out.push_back(skeleton_detection[j].u);
-    //             sklt_out.push_back(skeleton_detection[j].v);
-    //             vel_out.push_back(skel_vel[j].u);
-    //             vel_out.push_back(skel_vel[j].v);
-    //         }
-    //         ros_output.timestamp = tnow;
-    //         ros_output.pose = sklt_out;
-    //         ros_output.velocity = vel_out;
-    //         // publish data
-    //         ros_publisher.prepare() = ros_output;
-    //         ros_publisher.write();
-            
-    //     }
-    // }
 };
 
 int main(int argc, char *argv[])
