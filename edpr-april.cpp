@@ -200,7 +200,7 @@ public:
         pltDet = rf.check("pltDet") && rf.check("pltDet", Value(true)).asBool();
         pltTra = rf.check("pltTra") && rf.check("pltTra", Value(true)).asBool();
         pltRoi = rf.check("pr") && rf.check("pr", Value(true)).asBool();
-        detF = rf.check("detF", Value(1)).asInt32();
+        detF = rf.check("detF", Value(10)).asInt32();
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
         roiSize = rf.check("roi", Value(20)).asInt32();
@@ -519,6 +519,8 @@ public:
             state.setVelocity(jvs);
             state.updateFromVelocity(jvs, tnow);
             counter++;
+
+            yarp::os::Time::delay(0.0005);
 
 
             //send to ros as fast as possible
