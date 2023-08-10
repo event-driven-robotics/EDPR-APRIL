@@ -67,6 +67,7 @@ public:
         if (mn_container)
         {
             previous_skeleton.pose = hpecore::extractSkeletonFromYARP<Bottle>(*mn_container);
+            previous_skeleton.conf = hpecore::extractConfidenceFromYARP<Bottle>(*mn_container);
             previous_skeleton.timestamp = tic;
             previous_skeleton.delay = latest_ts - tic;
             waiting = false;
@@ -147,8 +148,9 @@ private:
     hpecore::multiJointLatComp state;
 
     // internal data structures
-    hpecore::skeleton13 skeleton_gt{0};
-    hpecore::skeleton13 skeleton_detection{0};
+    //hpecore::skeleton13 skeleton_gt{0};
+    //hpecore::skeleton13 skeleton_detection{0};
+    hpecore::stampedPose detected_pose;
 
     cv::Size image_size;
     cv::Mat edpr_logo;
@@ -216,7 +218,7 @@ public:
         pltTra = true;
         
 
-        int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py --gpu &");
+        int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py --gpu --upper &");
         while (!yarp::os::NetworkBase::exists("/movenet/sklt:o"))
             sleep(1);
         yInfo() << "MoveEnet started correctly";
@@ -412,11 +414,11 @@ public:
         binary_handler.getSurface().setTo(0.0);
 
         // plot skeletons
-        hpecore::drawSkeleton(canvas, skeleton_detection, {255, 0, 0}, 3);
-        hpecore::drawSkeleton(canvas, state.query(), {0, 0, 255}, 3);
-
-        hpecore::drawVel(canvas, skeleton_detection, state.queryDP(), {255, 255, 102}, 2);
-
+        hpecore::stampedPose pose_copy = detected_pose; 
+        hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3);
+        hpecore::drawVel(canvas, pose_copy, state.queryDP(), {255, 255, 102}, 2);
+        pose_copy.pose = state.query();
+        hpecore::drawSkeleton(canvas, pose_copy, {0, 0, 255}, 3);
 
         if (!edpr_logo.empty())
         {
@@ -498,19 +500,16 @@ public:
     {
         while(!isStopping()) {
             //detection
-            hpecore::stampedPose detected_pose;
+            
             bool was_detected = mn_handler.update(eros_handler.getSurface(), tnow, detected_pose);
             if (was_detected && hpecore::poseNonZero(detected_pose.pose))
             {
-                skeleton_detection = detected_pose.pose;
-                //latency = detected_pose.delay;
                 if (state.poseIsInitialised())
-                    state.updateFromPosition(skeleton_detection, detected_pose.timestamp);
+                    state.updateFromPosition(detected_pose.pose, detected_pose.timestamp);
                 else
-                    state.set(skeleton_detection, tnow);
+                    state.set(detected_pose.pose, tnow);
             }
 
-            
             if (!state.poseIsInitialised())
                continue;
 
