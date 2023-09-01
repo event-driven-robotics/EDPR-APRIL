@@ -532,11 +532,13 @@ public:
                 hpecore::skeleton13 vel = state.queryVelocity();
                 ros_output.pose.resize(pos.size()*2);
                 ros_output.velocity.resize(vel.size()*2);
+                ros_output.confidence.resize(detected_pose.conf.size());
                 for (int j = 0; j < pos.size(); j++) {
                     ros_output.pose[j * 2] = pos[j].u;
                     ros_output.pose[j * 2 + 1] = pos[j].v;
                     ros_output.velocity[j * 2] = vel[j].u;
                     ros_output.velocity[j * 2 + 1] = vel[j].v;
+                    ros_output.confidence[j] = detected_pose.conf[j];
                 }
                 ros_output.timestamp = tnow;
                 ros_publisher.write();
