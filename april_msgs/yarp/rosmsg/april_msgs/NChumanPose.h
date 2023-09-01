@@ -8,7 +8,8 @@
 // Generated from the following "april_msgs/NChumanPose" msg definition:
 //   float64 timestamp
 //   float64[] pose
-//   float64[] velocity// Instances of this class can be read and written with YARP ports,
+//   float64[] velocity
+//   float64[] confidence// Instances of this class can be read and written with YARP ports,
 // using a ROS-compatible format.
 
 #ifndef YARP_ROSMSG_april_msgs_NChumanPose_h
@@ -30,11 +31,13 @@ public:
     yarp::conf::float64_t timestamp;
     std::vector<yarp::conf::float64_t> pose;
     std::vector<yarp::conf::float64_t> velocity;
+    std::vector<yarp::conf::float64_t> confidence;
 
     NChumanPose() :
             timestamp(0.0),
             pose(),
-            velocity()
+            velocity(),
+            confidence()
     {
     }
 
@@ -48,6 +51,9 @@ public:
 
         // *** velocity ***
         velocity.clear();
+
+        // *** confidence ***
+        confidence.clear();
     }
 
     bool readBare(yarp::os::ConnectionReader& connection) override
@@ -69,6 +75,13 @@ public:
             return false;
         }
 
+        // *** confidence ***
+        len = connection.expectInt32();
+        confidence.resize(len);
+        if (len > 0 && !connection.expectBlock((char*)&confidence[0], sizeof(yarp::conf::float64_t)*len)) {
+            return false;
+        }
+
         return !connection.isError();
     }
 
@@ -76,7 +89,7 @@ public:
     {
         connection.convertTextMode();
         yarp::os::idl::WireReader reader(connection);
-        if (!reader.readListHeader(3)) {
+        if (!reader.readListHeader(4)) {
             return false;
         }
 
@@ -101,6 +114,16 @@ public:
         velocity.resize(len);
         for (int i=0; i<len; i++) {
             velocity[i] = (yarp::conf::float64_t)connection.expectFloat64();
+        }
+
+        // *** confidence ***
+        if (connection.expectInt32() != (BOTTLE_TAG_LIST|BOTTLE_TAG_FLOAT64)) {
+            return false;
+        }
+        len = connection.expectInt32();
+        confidence.resize(len);
+        for (int i=0; i<len; i++) {
+            confidence[i] = (yarp::conf::float64_t)connection.expectFloat64();
         }
 
         return !connection.isError();
@@ -130,13 +153,19 @@ public:
             connection.appendExternalBlock((char*)&velocity[0], sizeof(yarp::conf::float64_t)*velocity.size());
         }
 
+        // *** confidence ***
+        connection.appendInt32(confidence.size());
+        if (confidence.size()>0) {
+            connection.appendExternalBlock((char*)&confidence[0], sizeof(yarp::conf::float64_t)*confidence.size());
+        }
+
         return !connection.isError();
     }
 
     bool writeBottle(yarp::os::ConnectionWriter& connection) const override
     {
         connection.appendInt32(BOTTLE_TAG_LIST);
-        connection.appendInt32(3);
+        connection.appendInt32(4);
 
         // *** timestamp ***
         connection.appendInt32(BOTTLE_TAG_FLOAT64);
@@ -154,6 +183,13 @@ public:
         connection.appendInt32(velocity.size());
         for (size_t i=0; i<velocity.size(); i++) {
             connection.appendFloat64(velocity[i]);
+        }
+
+        // *** confidence ***
+        connection.appendInt32(BOTTLE_TAG_LIST|BOTTLE_TAG_FLOAT64);
+        connection.appendInt32(confidence.size());
+        for (size_t i=0; i<confidence.size(); i++) {
+            connection.appendFloat64(confidence[i]);
         }
 
         connection.convertTextMode();
@@ -176,13 +212,14 @@ public:
     static constexpr const char* typeName = "april_msgs/NChumanPose";
 
     // The checksum for this message, ROS will need this
-    static constexpr const char* typeChecksum = "f60fac524517d870dbaac768aeafa188";
+    static constexpr const char* typeChecksum = "da2e2f6003c4d5f24f74c221bd96fdcf";
 
     // The source text for this message, ROS will need this
     static constexpr const char* typeText = "\
 float64 timestamp\n\
 float64[] pose\n\
 float64[] velocity\n\
+float64[] confidence\n\
 ";
 
     yarp::os::Type getType() const override
