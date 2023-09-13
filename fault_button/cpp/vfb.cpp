@@ -287,12 +287,14 @@ public:
                 }
             }
             if(!autoThresh) {
+                static yarp::os::Stamp ys;
+                ys.update();
                 yarp::rosmsg::april_msgs::Emergency &rosmessage = ros_publisher.prepare();
-                rosmessage.header.seq = 0;
-                rosmessage.header.frame_id = "";
-                rosmessage.header.stamp.sec = (int)(yarp::os::Time::now());
-                rosmessage.header.stamp.nsec = 0;
+                rosmessage.header.seq = ys.getCount();
+                rosmessage.header.frame_id = "xmsg";
+                rosmessage.header.stamp = ys.getTime();
                 rosmessage.emergency_label = "visual_fault_button_triggered";
+                ros_publisher.setEnvelope(ys);
                 ros_publisher.write();
             }
         }
