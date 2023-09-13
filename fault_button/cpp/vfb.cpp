@@ -309,7 +309,7 @@ public:
                 //ros_publisher.write();
 
                 yarp::rosmsg::std_msgs::Int8 &rosmessage = ros_publisher.prepare();
-                rosmessage_2.data = 1;
+                rosmessage.data = 1;
                 ros_publisher.write();
 
             }
