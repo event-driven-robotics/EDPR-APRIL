@@ -71,7 +71,6 @@ private:
     yarp::os::Publisher<yarp::rosmsg::april_msgs::Emergency> ros_publisher;
 
     std::string calibration_path;
-    std::string usecase;
 
     bool loadCalibration(std::string calib_file_path)
     {
@@ -148,12 +147,12 @@ public:
         img = cv::Mat(img_size, CV_8UC3); img = 0;
         mask = cv::Mat(img_size, CV_8U); mask = 0;
 
-        usecase = rf.check("usecase", Value("latest")).asString();
-        if(usecase.empty())
-            usecase = "latest";
-        calibration_path = 
-            "/usr/local/src/EDPR-APRIL/fault_button/calibrations/" + usecase + "_calibration.txt";
-
+        calibration_path = rf.check("calib_path", Value("")).asString();
+        std::cout << calibration_path << std::endl;
+        if(calibration_path.empty())
+            calibration_path = 
+                "/usr/local/src/EDPR-APRIL/fault_button/calibrations/latest_calibration.txt";
+        std::cout << calibration_path << std::endl;
         if(loadCalibration(calibration_path)) {
             state=MONITOR;
             autoThresh = false;

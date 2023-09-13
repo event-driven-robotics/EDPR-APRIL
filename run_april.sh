@@ -12,4 +12,10 @@ echo "Run EDPR-APRIL application"
 edpr-april --thF 30  --detF 10 --movenet --gpu --ve pxt --ros &
 sleep 4
 echo "Run Visual Fault Button application"
-visual-fault-button --usecase $USECASE &
+
+if [ -z ${USECASE+x} ]; then 
+    echo "USECASE is unset";
+    USECASE="latest"
+fi
+fault_calib_path="/usr/local/src/EDPR-APRIL/fault_button/calibrations/${USECASE}_calibration.txt"
+visual-fault-button --calib_path $fault_calib_path &
