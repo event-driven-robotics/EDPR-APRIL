@@ -6,7 +6,7 @@ echo "Run YARP server connected to ROS"
 yarpserver --ros &
 sleep 2
 echo "Run ATIS-bridge"
-atis-bridge-sdk --s 40 --filter 0.01 &
+atis-bridge-sdk --s 60 --filter 0.01 &
 sleep 5
 echo "Run EDPR-APRIL application"
 edpr-april --thF 30  --detF 10 --movenet --gpu --ve pxt --ros &
