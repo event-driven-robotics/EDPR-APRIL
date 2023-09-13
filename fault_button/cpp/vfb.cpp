@@ -218,6 +218,8 @@ public:
                 int dist = sqrt((x-c_fbr.c.x)*(x-c_fbr.c.x)+(y-c_fbr.c.y)*(y-c_fbr.c.y));
                 if(dist < c_fbr.r)
                     mask.at<char>(y, x) = 1;
+                else
+                    mask.at<char>(y, x) = 0;
             }
         }
     }
