@@ -148,11 +148,10 @@ public:
         mask = cv::Mat(img_size, CV_8U); mask = 0;
 
         calibration_path = rf.check("calib_path", Value("")).asString();
-        std::cout << calibration_path << std::endl;
         if(calibration_path.empty())
             calibration_path = 
                 "/usr/local/src/EDPR-APRIL/fault_button/calibrations/latest_calibration.txt";
-        std::cout << calibration_path << std::endl;
+        yInfo() << "Calibration Parameters from:" << calibration_path;
         if(loadCalibration(calibration_path)) {
             state=MONITOR;
             autoThresh = false;
