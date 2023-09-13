@@ -70,6 +70,8 @@ private:
     yarp::os::Node* ros_node{nullptr};
     yarp::os::Publisher<yarp::rosmsg::april_msgs::Emergency> ros_publisher;
 
+    std::string calibration_path;
+
     bool loadCalibration(std::string calib_file_path)
     {
         yarp::os::ResourceFinder calib_reader;
@@ -145,11 +147,17 @@ public:
         img = cv::Mat(img_size, CV_8UC3); img = 0;
         mask = cv::Mat(img_size, CV_8U); mask = 0;
 
-        if(loadCalibration("calib_parameters.txt")) {
+        calibration_path = rf.check("calib_path", Value("")).asString();
+        if(calibration_path.empty())
+            calibration_path = 
+                "/usr/local/src/EDPR-APRIL/fault_button/calibrations/latest_calibration.txt";
+        yInfo() << "Calibration Parameters from:" << calibration_path;
+        if(loadCalibration(calibration_path)) {
             state=MONITOR;
             autoThresh = false;
             makeMask();
         } else {
+            std::cout << "could not load calibration" << std::endl;
             state=DISPLAY;
         }
 
@@ -182,7 +190,7 @@ public:
     bool close() override
     {
         // when the asynchronous thread is asked to stop, close ports and do other clean up
-        saveCalibration("calib_parameters.txt");
+        saveCalibration(calibration_path);
         return true;
     }
 
@@ -208,6 +216,8 @@ public:
                 int dist = sqrt((x-c_fbr.c.x)*(x-c_fbr.c.x)+(y-c_fbr.c.y)*(y-c_fbr.c.y));
                 if(dist < c_fbr.r)
                     mask.at<char>(y, x) = 1;
+                else
+                    mask.at<char>(y, x) = 0;
             }
         }
     }
