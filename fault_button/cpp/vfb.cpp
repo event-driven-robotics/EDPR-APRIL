@@ -294,6 +294,7 @@ public:
                 rosmessage.header.frame_id = "xmsg";
                 rosmessage.header.stamp = ys.getTime();
                 rosmessage.emergency_label = "visual_fault_button_triggered";
+                ros_publisher.setEnvelope(ys);
                 ros_publisher.write();
             }
         }
