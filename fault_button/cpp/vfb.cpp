@@ -11,6 +11,7 @@ Author: Arren Glover
 #include <fstream>
 #include "../../april_msgs/yarp/rosmsg/april_msgs/Emergency.h"
 #include <yarp/rosmsg/std_msgs/Int8.h>
+#include <yarp/rosmsg/sensor_msgs/Image.h>
 
 using std::vector;
 using yarp::os::Value;
@@ -69,7 +70,8 @@ private:
 
     // ros 
     yarp::os::Node* ros_node{nullptr};
-    yarp::os::Publisher<yarp::rosmsg::std_msgs::Int8> ros_publisher;
+    //yarp::os::Publisher<yarp::rosmsg::std_msgs::Int8> ros_publisher;
+    yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ros_publisher;
 
 
     std::string calibration_path;
@@ -308,8 +310,9 @@ public:
                 //ros_publisher.setEnvelope(ys);
                 //ros_publisher.write();
 
-                yarp::rosmsg::std_msgs::Int8 &rosmessage = ros_publisher.prepare();
-                rosmessage.data = 1;
+                //yarp::rosmsg::std_msgs::Int8 &rosmessage = ros_publisher.prepare();
+                //rosmessage.data = 1;
+                yarp::rosmsg::sensor_msgs::Image& rosmessage = ros_publisher.prepare();
                 ros_publisher.write();
 
             }
