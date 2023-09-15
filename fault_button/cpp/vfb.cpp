@@ -193,7 +193,6 @@ public:
     bool close() override
     {
         // when the asynchronous thread is asked to stop, close ports and do other clean up
-        saveCalibration(calibration_path);
         return true;
     }
 
@@ -326,7 +325,7 @@ public:
         } else {
             cv::putText(img, "Monitoring Visual Fault Button", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
             cv::putText(img, "ROS emergency message enabled", cv::Point(img_size.width*0.05, img_size.height*0.9), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-            cv::putText(img, "press (a) to enter threshold calibration mode", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+            cv::putText(img, "press (a) to enter threshold calibration mode, (s) to save", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         }
         cv::putText(img, "Current rate: " + std::to_string(count), cv::Point(img_size.width*0.05, img_size.height*0.10), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         cv::putText(img, "Current threshold: " + std::to_string(T * k), cv::Point(img_size.width*0.05, img_size.height*0.15), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
@@ -351,6 +350,8 @@ public:
                 trigger_rates.clear();
                 state=DISPLAY;
             }
+        } else if(c == 's') {
+            saveCalibration(calibration_path);
         }
 
         if(autoThresh)
