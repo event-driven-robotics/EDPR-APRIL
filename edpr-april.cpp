@@ -163,6 +163,7 @@ private:
     double scaler{1.0};
     double th_period{0.01}, thF{100.0};
     bool pltRoi{false};
+    double c_thresh{0.4};
     cv::Scalar colors[13] = {{0, 0, 180}, {0, 180, 0}, {0, 0, 180},
                             {180, 180, 0}, {180, 0, 180}, {0, 180, 180},
                             {120, 0, 180}, {120, 180, 0}, {0, 120, 180},
@@ -181,6 +182,18 @@ private:
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
     {
+
+        if(rf.check("help")) {
+            yInfo() << " EDPR APRIL HPE ";
+            yInfo() << "--name <string> : name of module for YARP ports";
+            yInfo() << "--f_vis <float> : visualisation rate [20]";
+            yInfo() << "--f_det <float> : HPE detection rate [5]";
+            yInfo() << "--pu <float>    : KF process uncertainty [10.0]";
+            yInfo() << "--muD <float>   : KF measurement uncertainty [1.0]";
+            yInfo() << "--confidence <float> : threshold for skeleton confidence [0.4]";
+            return false;
+        }
+
         // =====SET UP YARP=====
         if (!yarp::os::Network::checkNetwork(2.0))
         {
@@ -202,7 +215,7 @@ public:
         pltDet = rf.check("pltDet") && rf.check("pltDet", Value(true)).asBool();
         pltTra = rf.check("pltTra") && rf.check("pltTra", Value(true)).asBool();
         pltRoi = rf.check("pr") && rf.check("pr", Value(true)).asBool();
-        detF = rf.check("detF", Value(10)).asInt32();
+        detF = rf.check("f_det", Value(10)).asInt32();
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
         roiSize = rf.check("roi", Value(20)).asInt32();
@@ -211,8 +224,9 @@ public:
         double measUV = rf.check("muV", Value(0)).asFloat64();
         latency_compensation = rf.check("use_lc") && rf.check("use_lc", Value(true)).asBool();
         double lc = latency_compensation ? 1.0 : 0.0;
-        thF = rf.check("thF", Value(100.0)).asFloat64();
+        thF = rf.check("f_vis", Value(100.0)).asFloat64();
         th_period = 1/thF;
+        c_thresh = rf.check("confidence", Value(0.4)).asFloat64();
 
         // pltDet = true;
         pltTra = true;
@@ -415,10 +429,10 @@ public:
 
         // plot skeletons
         hpecore::stampedPose pose_copy = detected_pose; 
-        hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3);
-        hpecore::drawVel(canvas, pose_copy, state.queryDP(), {255, 255, 102}, 2);
+        hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3, c_thresh);
+        hpecore::drawVel(canvas, pose_copy, state.queryDP(), {255, 255, 102}, 2, c_thresh);
         pose_copy.pose = state.query();
-        hpecore::drawSkeleton(canvas, pose_copy, {0, 0, 255}, 3);
+        hpecore::drawSkeleton(canvas, pose_copy, {0, 0, 255}, 3, c_thresh);
 
         if (!edpr_logo.empty())
         {

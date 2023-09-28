@@ -9,7 +9,7 @@ echo "Run ATIS-bridge"
 atis-bridge-sdk --s 60 --filter 0.01 &
 sleep 5
 echo "Run EDPR-APRIL application"
-edpr-april --thF 30  --detF 10 --movenet --gpu --ve pxt --ros &
+edpr-april --f_vis 30  --f_det 10 --confidence 0.4 &
 sleep 4
 echo "Run Visual Fault Button application"
 
