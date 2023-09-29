@@ -3,6 +3,9 @@
 #export ROS_MASTER_URI=http://127.0.0.1:11311
 
 echo "Run YARP server connected to ROS"
+yarp namespace /april
+#yarp conf ${ROS_MASTER_URI:7:-6} 10000
+yarp conf ${YARPSERVER_IP} 10000
 yarpserver --ros &
 sleep 2
 echo "Run ATIS-bridge"

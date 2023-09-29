@@ -71,7 +71,8 @@ private:
     // ros 
     yarp::os::Node* ros_node{nullptr};
     //yarp::os::Publisher<yarp::rosmsg::std_msgs::Int8> ros_publisher;
-    yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ros_publisher;
+    //yarp::os::Publisher<yarp::rosmsg::sensor_msgs::Image> ros_publisher;
+    yarp::os::Publisher<yarp::rosmsg::april_msgs::Emergency> ros_publisher;
 
 
     std::string calibration_path;
@@ -137,7 +138,7 @@ public:
         }
 
         //ros interface
-        ros_node = new yarp::os::Node("/APRIL");
+        ros_node = new yarp::os::Node("/edpraprilvfb");
         if(!ros_publisher.topic("/sim/vfb"))
             yWarning() << "Could not open ROS publisher - messages will not be sent to ros";
         // =====READ PARAMETERS=====
@@ -299,20 +300,20 @@ public:
                 }
             }
             if(!autoThresh) {
-                //static yarp::os::Stamp ys;
-                //ys.update();
-                //yarp::rosmsg::april_msgs::Emergency &rosmessage = ros_publisher.prepare();
-                //rosmessage.header.seq = ys.getCount();
-                //rosmessage.header.frame_id = "xmsg";
-                //rosmessage.header.stamp = ys.getTime();
-                //rosmessage.emergency_label = "visual_fault_button_triggered";
-                //ros_publisher.setEnvelope(ys);
-                //ros_publisher.write();
+                static yarp::os::Stamp ys;
+                ys.update();
+                yarp::rosmsg::april_msgs::Emergency &rosmessage = ros_publisher.prepare();
+                rosmessage.header.seq = ys.getCount();
+                rosmessage.header.frame_id = "xmsg";
+                rosmessage.header.stamp = ys.getTime();
+                rosmessage.emergency_label = "visual_fault_button_triggered";
+                ros_publisher.setEnvelope(ys);
+                ros_publisher.write();
 
                 //yarp::rosmsg::std_msgs::Int8 &rosmessage = ros_publisher.prepare();
                 //rosmessage.data = 1;
-                yarp::rosmsg::sensor_msgs::Image& rosmessage = ros_publisher.prepare();
-                ros_publisher.write();
+                //yarp::rosmsg::sensor_msgs::Image& rosmessage = ros_publisher.prepare();
+                //ros_publisher.write();
 
             }
         }

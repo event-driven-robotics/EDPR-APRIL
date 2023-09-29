@@ -274,7 +274,7 @@ public:
         cv::resizeWindow("edpr-april", image_size);
 
         // set-up ROS interface
-        ros_node = new yarp::os::Node("/APRIL");
+        ros_node = new yarp::os::Node("/edpraprilhpe");
         if (!ros_publisher.topic("/pem/neuromorphic_camera/data"))
         {
             yError() << "Could not open ROS pose output publisher";
