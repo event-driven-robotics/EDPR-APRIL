@@ -10,8 +10,8 @@ Author: Arren Glover
 #include <string>
 #include <fstream>
 #include "../../april_msgs/yarp/rosmsg/april_msgs/Emergency.h"
-#include <yarp/rosmsg/std_msgs/Int8.h>
-#include <yarp/rosmsg/sensor_msgs/Image.h>
+//#include <yarp/rosmsg/std_msgs/Int8.h>
+//#include <yarp/rosmsg/sensor_msgs/Image.h>
 
 using std::vector;
 using yarp::os::Value;
@@ -139,7 +139,7 @@ public:
 
         //ros interface
         ros_node = new yarp::os::Node("/edpraprilvfb");
-        if(!ros_publisher.topic("/sim/vfb"))
+        if(!ros_publisher.topic("/sim/visualFaultButton/trigger"))
             yWarning() << "Could not open ROS publisher - messages will not be sent to ros";
         // =====READ PARAMETERS=====
 
