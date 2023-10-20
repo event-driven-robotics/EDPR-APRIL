@@ -15,6 +15,11 @@ Author: Franco Di Pietro, Arren Glover
 #include <string>
 #include "april_msgs/yarp/rosmsg/april_msgs/NChumanPose.h"
 #include <yarp/rosmsg/sensor_msgs/Image.h>
+#include <iostream>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -132,6 +137,9 @@ private:
     // event reading
     std::thread camera_handler_thread;
     std::thread hpe_thread;
+    std::thread sklt_output_thread;
+    std::mutex mutex;
+
     ev::window<ev::AE> input_events;
     
 
@@ -179,6 +187,10 @@ private:
     ImageTopicType publisherPort_eros, publisherPort_evs;
     int counter{0};
 
+    BufferedPort<Bottle> output_port;
+    struct sockaddr_in serverAddr;
+    int img_out_udp_sock;
+
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
     {
@@ -210,6 +222,26 @@ public:
             return false;
         }
         
+        if (!output_port.open(getName("/sklt:o")))
+        {
+            yError() << "Could not open skeleton output port";
+            return false;
+        }
+
+        // Seting up UDP socket
+        img_out_udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
+        if (img_out_udp_sock < 0) {
+            std::cerr << "Error: Unable to create socket." << std::endl;
+            return -1;
+        }
+
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_port = htons(12345);
+
+        if (inet_pton(AF_INET, "192.168.65.4", &(serverAddr.sin_addr)) <= 0) {
+            std::cerr << "Error: Invalid IP address." << std::endl;
+            return -1;
+        }
 
         // =====READ PARAMETERS=====
         pltDet = rf.check("pltDet") && rf.check("pltDet", Value(true)).asBool();
@@ -295,6 +327,7 @@ public:
         
         camera_handler_thread = std::thread([this]{ this->run_camera_interface(); });
         hpe_thread = std::thread([this]{ this->run_hpe(); });
+        sklt_output_thread = std::thread([this]{ this->write_sklt_to_yarp(); });
 
         return true;
     }
@@ -385,47 +418,47 @@ public:
         static yarp::os::Stamp ystamp;
         ystamp.update();
 
-        // publish images using ROS
-        // EROS
-        static cv::Mat cvEROS = cv::Mat(image_size, CV_8UC3);
-        cvEROS.setTo(cv::Vec3b(0, 0, 0));
-        drawEROS(cvEROS);
-        auto yarpEROS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEROS);
-        yarp::rosmsg::sensor_msgs::Image& rosEROS = publisherPort_eros.prepare();
-        rosEROS.data.resize(yarpEROS.getRawImageSize());
-        rosEROS.width = yarpEROS.width();
-        rosEROS.height = yarpEROS.height();
-        rosEROS.encoding = "8UC3";//yarp::dev::ROSPixelCode::yarp2RosPixelCode(yarpEROS.getPixelCode());
-        rosEROS.step = yarpEROS.getRowSize();
-        rosEROS.is_bigendian = 0;
-        rosEROS.header.frame_id = "eros";
-        rosEROS.header.seq = ystamp.getCount();
-        rosEROS.header.stamp = ystamp.getTime();
-        memcpy(rosEROS.data.data(), yarpEROS.getRawImage(), yarpEROS.getRawImageSize());
-        publisherPort_eros.setEnvelope(ystamp);
-        publisherPort_eros.write();
+        // // publish images using ROS
+        // // EROS
+        // static cv::Mat cvEROS = cv::Mat(image_size, CV_8UC3);
+        // cvEROS.setTo(cv::Vec3b(0, 0, 0));
+        // drawEROS(cvEROS);
+        // auto yarpEROS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEROS);
+        // yarp::rosmsg::sensor_msgs::Image& rosEROS = publisherPort_eros.prepare();
+        // rosEROS.data.resize(yarpEROS.getRawImageSize());
+        // rosEROS.width = yarpEROS.width();
+        // rosEROS.height = yarpEROS.height();
+        // rosEROS.encoding = "8UC3";//yarp::dev::ROSPixelCode::yarp2RosPixelCode(yarpEROS.getPixelCode());
+        // rosEROS.step = yarpEROS.getRowSize();
+        // rosEROS.is_bigendian = 0;
+        // rosEROS.header.frame_id = "eros";
+        // rosEROS.header.seq = ystamp.getCount();
+        // rosEROS.header.stamp = ystamp.getTime();
+        // memcpy(rosEROS.data.data(), yarpEROS.getRawImage(), yarpEROS.getRawImageSize());
+        // publisherPort_eros.setEnvelope(ystamp);
+        // publisherPort_eros.write();
 
-        // EV image
-        static cv::Mat cvEVS;
-        drawEVENTS(cvEVS);
+        // // EV image
+        // static cv::Mat cvEVS;
+        // drawEVENTS(cvEVS);
 
-        auto yarpEVS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEVS);
-        yarp::rosmsg::sensor_msgs::Image& rosEVS = publisherPort_evs.prepare();
-        rosEVS.data.resize(yarpEVS.getRawImageSize());
-        rosEVS.width = yarpEVS.width();
-        rosEVS.height = yarpEVS.height();
-        rosEVS.encoding = "8UC3";//yarp::dev::ROSPixelCode::yarp2RosPixelCode(yarpEVS.getPixelCode());
-        rosEVS.step = yarpEVS.getRowSize();
-        rosEVS.is_bigendian = 0;
-        rosEVS.header.frame_id = "eventimage";
-        rosEVS.header.seq = ystamp.getCount();
-        rosEVS.header.stamp = ystamp.getTime();
-        memcpy(rosEVS.data.data(), yarpEVS.getRawImage(), yarpEVS.getRawImageSize());
+        // auto yarpEVS = yarp::cv::fromCvMat<yarp::sig::PixelRgb>(cvEVS);
+        // yarp::rosmsg::sensor_msgs::Image& rosEVS = publisherPort_evs.prepare();
+        // rosEVS.data.resize(yarpEVS.getRawImageSize());
+        // rosEVS.width = yarpEVS.width();
+        // rosEVS.height = yarpEVS.height();
+        // rosEVS.encoding = "8UC3";//yarp::dev::ROSPixelCode::yarp2RosPixelCode(yarpEVS.getPixelCode());
+        // rosEVS.step = yarpEVS.getRowSize();
+        // rosEVS.is_bigendian = 0;
+        // rosEVS.header.frame_id = "eventimage";
+        // rosEVS.header.seq = ystamp.getCount();
+        // rosEVS.header.stamp = ystamp.getTime();
+        // memcpy(rosEVS.data.data(), yarpEVS.getRawImage(), yarpEVS.getRawImageSize());
 
-        publisherPort_evs.setEnvelope(ystamp);
-        publisherPort_evs.write();     
+        // publisherPort_evs.setEnvelope(ystamp);
+        // publisherPort_evs.write();     
 
-        binary_handler.getSurface().setTo(0.0);
+        // binary_handler.getSurface().setTo(0.0);
 
         // plot skeletons
         hpecore::stampedPose pose_copy = detected_pose; 
@@ -444,6 +477,12 @@ public:
         std::stringstream ss;
         ss << std::fixed << std::setprecision(1) << scaler;
         std::string mystring = ss.str();
+
+        std::vector<uchar> buffer;
+        cv::imencode(".jpg", canvas, buffer);
+
+        // Send the buffer over UDP
+        sendto(img_out_udp_sock, buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
         cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
@@ -510,10 +549,32 @@ public:
         }
     }
 
+    void write_sklt_to_yarp(){
+        sleep(10);
+        while(!isStopping()){
+            mutex.lock();
+            auto skeleton = state.query();
+            Bottle& bot = output_port.prepare();
+            bot.clear();
+            bot.addString("SKLT");
+            Bottle& skltBot = bot.addList();
+            skltBot.clear();
+            for (auto &v: skeleton){
+                skltBot.addInt16(v.u);
+                skltBot.addInt16(v.v);
+            }
+            mutex.unlock();
+            output_port.write();
+            usleep(20000);
+        }
+    }
+
     void run_hpe()
     {
+
         while(!isStopping()) {
             //detection
+            mutex.lock();    
             
             bool was_detected = mn_handler.update(eros_handler.getSurface(), tnow, detected_pose);
             if (was_detected && hpecore::poseNonZero(detected_pose.pose))
@@ -524,40 +585,44 @@ public:
                     state.set(detected_pose.pose, tnow);
             }
 
-            if (!state.poseIsInitialised())
-               continue;
+            if (!state.poseIsInitialised()){
+                mutex.unlock();
+                continue;
+            }
 
             //velocity
             auto jvs = velocity_estimator.multi_area_velocity(sae_handler.getSurface(), tnow, state.query(), roiSize);
             state.setVelocity(jvs);
             state.updateFromVelocity(jvs, tnow);
-            counter++;
 
-            yarp::os::Time::delay(0.0005);
+            // counter++;
+            mutex.unlock();
+            // yarp::os::Time::delay(0.0005);
 
 
-            //send to ros as fast as possible
-            static double timer = yarp::os::Time::now();
-            double dt = yarp::os::Time::now() - timer;
-            if (dt > 0.01) {
-                timer += dt;
-                auto &ros_output = ros_publisher.prepare();
-                hpecore::skeleton13 pos = state.query();
-                hpecore::skeleton13 vel = state.queryVelocity();
-                ros_output.pose.resize(pos.size()*2);
-                ros_output.velocity.resize(vel.size()*2);
-                ros_output.confidence.resize(detected_pose.conf.size());
-                for (int j = 0; j < pos.size(); j++) {
-                    ros_output.pose[j * 2] = pos[j].u;
-                    ros_output.pose[j * 2 + 1] = pos[j].v;
-                    ros_output.velocity[j * 2] = vel[j].u;
-                    ros_output.velocity[j * 2 + 1] = vel[j].v;
-                    ros_output.confidence[j] = detected_pose.conf[j];
-                }
-                ros_output.timestamp = tnow;
-                ros_publisher.write();
-            }
+            // //send to ros as fast as possible
+            // static double timer = yarp::os::Time::now();
+            // double dt = yarp::os::Time::now() - timer;
+            // if (dt > 0.01) {
+            //     timer += dt;
+            //     auto &ros_output = ros_publisher.prepare();
+            //     hpecore::skeleton13 pos = state.query();
+            //     hpecore::skeleton13 vel = state.queryVelocity();
+            //     ros_output.pose.resize(pos.size()*2);
+            //     ros_output.velocity.resize(vel.size()*2);
+            //     ros_output.confidence.resize(detected_pose.conf.size());
+            //     for (int j = 0; j < pos.size(); j++) {
+            //         ros_output.pose[j * 2] = pos[j].u;
+            //         ros_output.pose[j * 2 + 1] = pos[j].v;
+            //         ros_output.velocity[j * 2] = vel[j].u;
+            //         ros_output.velocity[j * 2 + 1] = vel[j].v;
+            //         ros_output.confidence[j] = detected_pose.conf[j];
+            //     }
+            //     ros_output.timestamp = tnow;
+            //     ros_publisher.write();
+            // }
         }
+    
     }
 };
 
