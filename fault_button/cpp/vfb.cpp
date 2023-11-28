@@ -32,7 +32,7 @@ private:
     double T{5e5};       // threshold events/second
     double initT{5e5};
 
-    enum state_name{DISPLAY, FBR_DRAW, MONITOR, FINISHED};
+    enum state_name{DISPLAY, FBR_DRAW, MASK_DRAW, MONITOR, FINISHED};
     state_name state{DISPLAY};
     cv::Mat img, mask;
 
@@ -43,6 +43,7 @@ private:
     } circle_parameters;
 
     circle_parameters c_fbr{{0,0},0,false};
+    circle_parameters c_mask{{0,0},0,false};
 
     // strcts for 
     typedef struct rate_buffer {
@@ -90,9 +91,13 @@ private:
         c_fbr.c.y = ps.find("y").asInt32();
         c_fbr.r   = ps.find("r").asInt32();
         T         = ps.find("T").asFloat64();
+        c_mask.c.x = ps.find("x_mask").asInt32();
+        c_mask.c.y = ps.find("y_mask").asInt32();
+        c_mask.r   = ps.find("r_mask").asInt32();
 
         yInfo() << "Loaded parameters";
-        yInfo() << "[" << c_fbr.c.x << "," << c_fbr.c.y << "]@" << c_fbr.r << "pixels";
+        yInfo() << "Active area[" << c_fbr.c.x << "," << c_fbr.c.y << "]@" << c_fbr.r << "pixels";
+        yInfo() << "Masked area[" << c_mask.c.x << "," << c_mask.c.y << "]@" << c_mask.r << "pixels";
         yInfo() << "Threshold:" << T;
 
         return true;
@@ -112,6 +117,9 @@ private:
         writer << "y " << c_fbr.c.y << std::endl;
         writer << "r " << c_fbr.r << std::endl;
         writer << "T " << std::fixed << std::setprecision(3) << T << std::endl;
+        writer << "x_mask " << c_mask.c.x << std::endl;
+        writer << "y_mask " << c_mask.c.y << std::endl;
+        writer << "r_mask " << c_mask.r << std::endl;
         writer.flush();
         writer.close();
         return true;
@@ -217,7 +225,8 @@ public:
         for(int x = 0; x < img_size.width; x++) {
             for(int y = 0; y < img_size.height; y++) {
                 int dist = sqrt((x-c_fbr.c.x)*(x-c_fbr.c.x)+(y-c_fbr.c.y)*(y-c_fbr.c.y));
-                if(dist < c_fbr.r)
+                int dist_mask = sqrt((x-c_mask.c.x)*(x-c_mask.c.x)+(y-c_mask.c.y)*(y-c_mask.c.y));
+                if(dist < c_fbr.r && dist_mask > c_mask.r)
                     mask.at<char>(y, x) = 1;
                 else
                     mask.at<char>(y, x) = 0;
@@ -266,6 +275,30 @@ public:
         if(c == '\e')
             state = FINISHED;
         else if(c == ' ') {
+            cv::setMouseCallback(getName(), mouseCall, &c_mask);
+            makeMask();
+            state = MASK_DRAW;
+        }
+    }
+
+    void mask_draw()
+    {
+        cv::Mat img_display; img.copyTo(img_display);
+        
+        cv::circle(img_display, c_mask.c, c_mask.r, {120, 10, 10}, -1);
+        cv::circle(img_display, c_mask.c, c_mask.r, {255, 0, 0}, 4);
+
+        cv::putText(img_display, "Calibrating: Fault Button Position and Region", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "DRAW masked area to ignore:", cv::Point(img_size.width*0.05, img_size.height*0.80), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "1. click and hold on area position", cv::Point(img_size.width*0.05, img_size.height*0.85), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "2. drag to form the region size and release", cv::Point(img_size.width*0.05, img_size.height*0.9), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "3. repeat if needed. press space when finished", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+
+        cv::imshow(getName(), img_display);
+        char c = cv::waitKey(1);
+        if(c == '\e')
+            state = FINISHED;
+        else if(c == ' ') {
             cv::setMouseCallback(getName(), nullptr);
             makeMask();
             state = MONITOR;
@@ -282,6 +315,8 @@ public:
         img = 0;
         cv::circle(img, c_fbr.c, c_fbr.r, {50, 50, 50},   -1);
         cv::circle(img, c_fbr.c, c_fbr.r, {120, 120, 120}, 4);
+        cv::circle(img, c_fbr.c, c_fbr.r, {50, 50, 50},   -1);
+        cv::circle(img, c_mask.c, c_mask.r, {0, 0, 0}, -1);
         for(auto &v : input_events) {
             if(mask.at<char>(v.y, v.x)) {
                 img.at<cv::Vec3b>(v.y, v.x) = {0, 200, 0};
@@ -493,6 +528,8 @@ public:
                 display(); break;
             case(FBR_DRAW):
                 fbr_draw(); break;
+            case(MASK_DRAW):
+                mask_draw(); break;
             case(MONITOR):
                 monitor(); break;
             case(FINISHED):
