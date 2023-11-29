@@ -1,6 +1,9 @@
 [VISUAL_FAULT_BUTTON_CALIB]
 
-x 72
-y 134
-r 74
-T 133300.000
+x 54
+y 147
+r 60
+T 65152.008
+x_mask 40
+y_mask 131
+r_mask 16
