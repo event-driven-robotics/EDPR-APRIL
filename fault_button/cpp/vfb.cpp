@@ -289,15 +289,24 @@ public:
         cv::circle(img_display, c_mask.c, c_mask.r, {255, 0, 0}, 4);
 
         cv::putText(img_display, "Calibrating: Fault Button Position and Region", cv::Point(img_size.width*0.05, img_size.height*0.05), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img_display, "DRAW masked area to ignore:", cv::Point(img_size.width*0.05, img_size.height*0.80), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "DRAW area to ignore:", cv::Point(img_size.width*0.05, img_size.height*0.80), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         cv::putText(img_display, "1. click and hold on area position", cv::Point(img_size.width*0.05, img_size.height*0.85), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
         cv::putText(img_display, "2. drag to form the region size and release", cv::Point(img_size.width*0.05, img_size.height*0.9), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
-        cv::putText(img_display, "3. repeat if needed. press space when finished", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
+        cv::putText(img_display, "3. repeat if needed. press space when finished. Press c to skip", cv::Point(img_size.width*0.05, img_size.height*0.95), cv::FONT_HERSHEY_PLAIN, 1.0, {255, 255, 255});
 
         cv::imshow(getName(), img_display);
         char c = cv::waitKey(1);
         if(c == '\e')
             state = FINISHED;
+        else if(c == 'c') {
+            // don't draw mask
+            c_mask.c.x = -1;
+            c_mask.c.y = -1;
+            c_mask.r = 0;
+            cv::setMouseCallback(getName(), nullptr);
+            makeMask();
+            state = MONITOR;
+        }
         else if(c == ' ') {
             cv::setMouseCallback(getName(), nullptr);
             makeMask();
