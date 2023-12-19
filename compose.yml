@@ -1,0 +1,26 @@
+services:
+  edprapril:
+    build: .
+    image: "edprapril:latest"
+    container_name: hpe
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /tmp/.X11-unix/:/tmp/.X11-unix
+      - ~/.ssh:/root/.ssh:ro
+      - ${PATH_TO_CODE:-/dev/null}:/root/code
+      - ${PATH_TO_DATA:-/dev/null}:/root/data:ro
+    environment:
+      - DISPLAY=unix$DISPLAY
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu] 
+    ports:
+      - "10000-10100:10000-10100" # 100 YARP ports. Increase range for more ports
+    stdin_open : true
+    tty: true
+    network_mode: "host"
