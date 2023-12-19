@@ -29,7 +29,7 @@ The software was tested on Ubuntu 20.04.2 LTS with an Nvidia GPU.
 - Run the Docker container and, inside it, run the pose detector
     ```shell
     $ xhost +
-    $ docker run -it --privileged --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev/bus/usb:/dev/bus/usb -e DISPLAY=unix$DISPLAY --runtime=nvidia --name april-event-pose april-event-pose
+    $ docker run -it --privileged --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /dev/bus/usb:/dev/bus/usb -e DISPLAY=unix$DISPLAY --gpus all --name april-event-pose april-event-pose
     ```
 
 :bulb: use `-v <local_dir>:<container_dir>` to mount further folders inside the container in order to transfer data between your local machine and the container, if needed.
