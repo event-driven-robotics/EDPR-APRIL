@@ -25,6 +25,27 @@ using namespace yarp::os;
 using namespace yarp::sig;
 using std::vector;
 
+
+std::string executeCommand(const char* cmd) {
+    char buffer[128];
+    std::string result = "";
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (!feof(pipe)) {
+        if (fgets(buffer, 128, pipe) != nullptr) {
+            result += buffer;
+        }
+    }
+    pclose(pipe);
+        // Remove the trailing newline character
+    if (!result.empty() && result[result.length() - 1] == '\n') {
+        result.erase(result.length() - 1);
+    }
+    return result;
+}
+
 class externalDetector
 {
 private:
@@ -189,7 +210,7 @@ private:
 
     BufferedPort<Bottle> output_port;
     struct sockaddr_in serverAddr;
-    int img_out_udp_sock;
+    int img_out_tcp_sock;
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -227,20 +248,27 @@ public:
             yError() << "Could not open skeleton output port";
             return false;
         }
-
+        
         // Seting up UDP socket
-        img_out_udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
-        if (img_out_udp_sock < 0) {
+        img_out_tcp_sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (img_out_tcp_sock < 0) {
             std::cerr << "Error: Unable to create socket." << std::endl;
-            return -1;
+            return false;
         }
 
         serverAddr.sin_family = AF_INET;
-        serverAddr.sin_port = htons(12345);
-
-        if (inet_pton(AF_INET, "192.168.65.4", &(serverAddr.sin_addr)) <= 0) {
+        serverAddr.sin_port = htons(10099);
+        std::string defaultIP = executeCommand("getent hosts host.docker.internal | awk '{print $1}'");
+        if (inet_pton(AF_INET, defaultIP.c_str(), &(serverAddr.sin_addr)) <= 0)
+        {
             std::cerr << "Error: Invalid IP address." << std::endl;
-            return -1;
+            return false;
+        }
+
+        if (connect(img_out_tcp_sock, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+        {
+            yError() << ("Could not find TCP listener available. Exiting");
+            return false;
         }
 
         // =====READ PARAMETERS=====
@@ -302,8 +330,8 @@ public:
         Network::connect(getName("/eros:o"), "/movenet/img:i", "fast_tcp");
         Network::connect("/file/atis/AE:o", getName("/AE:i"), "fast_tcp");
 
-        cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
-        cv::resizeWindow("edpr-april", image_size);
+        // cv::namedWindow("edpr-april", cv::WINDOW_NORMAL);
+        // cv::resizeWindow("edpr-april", image_size);
 
         // set-up ROS interface
         ros_node = new yarp::os::Node("/edpraprilhpe");
@@ -462,17 +490,22 @@ public:
 
         // plot skeletons
         hpecore::stampedPose pose_copy = detected_pose; 
-        hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3, c_thresh);
+        try
+        {
+            hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3, c_thresh);
+        } catch(cv::Exception e){
+            yDebug() << e.what();
+        }
         hpecore::drawVel(canvas, pose_copy, state.queryDP(), {255, 255, 102}, 2, c_thresh);
         pose_copy.pose = state.query();
         hpecore::drawSkeleton(canvas, pose_copy, {0, 0, 255}, 3, c_thresh);
 
-        if (!edpr_logo.empty())
-        {
-            static cv::Mat mask;
-            cv::cvtColor(edpr_logo, mask, CV_BGR2GRAY);
-            edpr_logo.copyTo(canvas, mask);
-        }
+        // if (!edpr_logo.empty())
+        // {
+        //     static cv::Mat mask;
+        //     cv::cvtColor(edpr_logo, mask, CV_BGR2GRAY);
+        //     edpr_logo.copyTo(canvas, mask);
+        // }
 
         std::stringstream ss;
         ss << std::fixed << std::setprecision(1) << scaler;
@@ -480,11 +513,11 @@ public:
 
         std::vector<uchar> buffer;
         cv::imencode(".jpg", canvas, buffer);
-
+        
         // Send the buffer over UDP
-        sendto(img_out_udp_sock, buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
-        cv::imshow("edpr-april", canvas);
+        sendto(img_out_tcp_sock, buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+        // cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
         if (key_pressed > 0)
         {
@@ -552,7 +585,6 @@ public:
     void write_sklt_to_yarp(){
         sleep(10);
         while(!isStopping()){
-            mutex.lock();
             auto skeleton = state.query();
             Bottle& bot = output_port.prepare();
             bot.clear();
@@ -563,7 +595,6 @@ public:
                 skltBot.addInt16(v.u);
                 skltBot.addInt16(v.v);
             }
-            mutex.unlock();
             output_port.write();
             usleep(20000);
         }
@@ -574,7 +605,6 @@ public:
 
         while(!isStopping()) {
             //detection
-            mutex.lock();    
             
             bool was_detected = mn_handler.update(eros_handler.getSurface(), tnow, detected_pose);
             if (was_detected && hpecore::poseNonZero(detected_pose.pose))
@@ -586,7 +616,6 @@ public:
             }
 
             if (!state.poseIsInitialised()){
-                mutex.unlock();
                 continue;
             }
 
@@ -596,7 +625,6 @@ public:
             state.updateFromVelocity(jvs, tnow);
 
             // counter++;
-            mutex.unlock();
             // yarp::os::Time::delay(0.0005);
 
 
