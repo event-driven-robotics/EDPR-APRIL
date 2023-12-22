@@ -151,6 +151,11 @@ public:
     }
 };
 
+// redefinition of function to avoid name conflict with RFModule::close
+void close_socket(int fd){
+    close(fd);
+}
+
 class APRIL_HPE : public RFModule
 {
 
@@ -159,6 +164,7 @@ private:
     std::thread camera_handler_thread;
     std::thread hpe_thread;
     std::thread sklt_output_thread;
+    std::thread tcp_connection_thread;
     std::mutex mutex;
 
     ev::window<ev::AE> input_events;
@@ -211,6 +217,7 @@ private:
     BufferedPort<Bottle> output_port;
     struct sockaddr_in serverAddr;
     int img_out_tcp_sock;
+    bool is_tcp_connected{false};
 
 public:
     bool configure(yarp::os::ResourceFinder &rf) override
@@ -249,12 +256,7 @@ public:
             return false;
         }
         
-        // Seting up UDP socket
-        img_out_tcp_sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (img_out_tcp_sock < 0) {
-            std::cerr << "Error: Unable to create socket." << std::endl;
-            return false;
-        }
+        if (!init_tcp_socket()) return false;
 
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(10099);
@@ -262,12 +264,6 @@ public:
         if (inet_pton(AF_INET, defaultIP.c_str(), &(serverAddr.sin_addr)) <= 0)
         {
             std::cerr << "Error: Invalid IP address." << std::endl;
-            return false;
-        }
-
-        if (connect(img_out_tcp_sock, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-        {
-            yError() << ("Could not find TCP listener available. Exiting");
             return false;
         }
 
@@ -356,8 +352,29 @@ public:
         camera_handler_thread = std::thread([this]{ this->run_camera_interface(); });
         hpe_thread = std::thread([this]{ this->run_hpe(); });
         sklt_output_thread = std::thread([this]{ this->write_sklt_to_yarp(); });
+        tcp_connection_thread = std::thread([this]{ this->connection_attempt_loop(); });
 
         return true;
+    }
+
+    bool init_tcp_socket(){
+        img_out_tcp_sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (img_out_tcp_sock < 0) {
+            std::cerr << "Error: Unable to create socket." << std::endl;
+            return false;
+        }
+        return true;
+    }
+
+    void connection_attempt_loop(){
+        
+        while (connect(img_out_tcp_sock, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+        {
+            yError() << ("Could not find TCP listener available. Trying again in 5 seconds");
+            sleep(5);
+        }
+        yInfo() << "TCP connected!";
+        is_tcp_connected = true;
     }
 
     double getPeriod() override
@@ -490,13 +507,13 @@ public:
 
         // plot skeletons
         hpecore::stampedPose pose_copy = detected_pose; 
-        try
-        {
-            hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3, c_thresh);
-        } catch(cv::Exception e){
-            yDebug() << e.what();
-        }
-        hpecore::drawVel(canvas, pose_copy, state.queryDP(), {255, 255, 102}, 2, c_thresh);
+        // try
+        // {
+        //     hpecore::drawSkeleton(canvas, pose_copy, {255, 0, 0}, 3, c_thresh);
+        // } catch(cv::Exception e){
+        //     yDebug() << e.what();
+        // }
+        // hpecore::drawVel(canvas, pose_copy, state.queryDP(), {255, 255, 102}, 2, c_thresh);
         pose_copy.pose = state.query();
         hpecore::drawSkeleton(canvas, pose_copy, {0, 0, 255}, 3, c_thresh);
 
@@ -513,10 +530,21 @@ public:
 
         std::vector<uchar> buffer;
         cv::imencode(".jpg", canvas, buffer);
-        
-        // Send the buffer over UDP
 
-        sendto(img_out_tcp_sock, buffer.data(), buffer.size(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+        // Send the buffer over TCP
+
+        if (is_tcp_connected)
+        {
+            int bytesSent = send(img_out_tcp_sock, buffer.data(), buffer.size(), MSG_NOSIGNAL);
+            if (bytesSent < 0){
+                is_tcp_connected = false;
+                close_socket(img_out_tcp_sock);
+                init_tcp_socket();
+                tcp_connection_thread.join();
+                
+                tcp_connection_thread = std::thread([this] { this->connection_attempt_loop(); });
+            }
+        }
         // cv::imshow("edpr-april", canvas);
         char key_pressed = cv::waitKey(10);
         if (key_pressed > 0)
