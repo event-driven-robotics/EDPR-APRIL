@@ -1,0 +1,34 @@
+---
+services:
+  edpr-april:
+    container_name: edpr-april-demo
+    build: . 
+    privileged: true
+    network_mode: host
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    volumes:
+      - /tmp/.X11-unix/:/tmp/.X11-unix
+      - /dev/bus/usb:/dev/bus/usb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      DISPLAY: unix$DISPLAY
+      ROS_MASTER_URI: http://127.0.0.1:11311
+      ROS_HOSTNAME: 192.168.0.200
+      ROS_IP: 192.168.0.200
+      YARPSERVER_IP: 10.0.3.1
+      USECASE: uc1_asin
+      P_DETF: 10
+      P_VISF: 30
+      P_CAMS: 60
+      P_CAMF: 0.01
+      P_CONF: 0.4
+    # restart: always
+    working_dir: /usr/local/src/EDPR-APRIL
+    command: sh -c "./run_april.sh; bash"

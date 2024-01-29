@@ -4,15 +4,15 @@
 
 echo "Run YARP server connected to ROS"
 yarp namespace /april
-#yarp conf ${ROS_MASTER_URI:7:-6} 10000
+# yarp conf ${ROS_MASTER_URI:7:-6} 10000
 yarp conf ${YARPSERVER_IP} 10000
 yarpserver --ros &
 sleep 2
 echo "Run ATIS-bridge"
-atis-bridge-sdk --s 60 --filter 0.01 &
+atis-bridge-sdk --gen3 --s ${P_CAMS} --filter ${P_CAMF} &
 sleep 5
 echo "Run EDPR-APRIL application"
-edpr-april --f_vis 30  --f_det 10 --confidence 0.4 &
+edpr-april --f_vis ${P_VISF}  --f_det ${P_DETF} --confidence ${P_CONF} &
 sleep 4
 echo "Run Visual Fault Button application"
 
