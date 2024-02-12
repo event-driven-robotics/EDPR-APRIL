@@ -9,7 +9,7 @@ yarp conf ${YARPSERVER_IP} 10000
 yarpserver --ros &
 sleep 2
 echo "Run ATIS-bridge"
-atis-bridge-sdk --gen3 --s ${P_CAMS} --filter ${P_CAMF} &
+atis-bridge-sdk --s ${P_CAMS} --filter ${P_CAMF} &
 sleep 5
 echo "Run EDPR-APRIL application"
 edpr-april --f_vis ${P_VISF}  --f_det ${P_DETF} --confidence ${P_CONF} &

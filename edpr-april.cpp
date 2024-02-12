@@ -327,7 +327,8 @@ public:
     {
         cv::Mat eros8;
         eros_handler.getSurface().convertTo(eros8, CV_8U);
-        cv::GaussianBlur(eros8, eros8, {5, 5}, -1);
+        cv::GaussianBlur(eros8, eros8, {9, 9}, 0);
+        cv::normalize(eros8, eros8, 0, 255, cv::NORM_MINMAX);
         cv::cvtColor(eros8, img, cv::COLOR_GRAY2BGR);
     }
 
