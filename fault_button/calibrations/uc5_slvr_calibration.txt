@@ -3,7 +3,7 @@
 x 513
 y 11
 r 181
-T 600000
+T 500000
 x_mask -1
 y_mask -1
 r_mask 0
