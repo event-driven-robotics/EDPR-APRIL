@@ -263,8 +263,10 @@ public:
         std::string defaultIP = executeCommand("getent hosts host.docker.internal | awk '{print $1}'");
         if (inet_pton(AF_INET, defaultIP.c_str(), &(serverAddr.sin_addr)) <= 0)
         {
-            std::cerr << "Error: Invalid IP address." << std::endl;
-            return false;
+            if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0){
+                std::cerr << "Error: Invalid IP address." << std::endl;
+                return false;
+            }
         }
 
         // =====READ PARAMETERS=====
