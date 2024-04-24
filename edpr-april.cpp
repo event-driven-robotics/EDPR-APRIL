@@ -260,13 +260,10 @@ public:
 
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(10099);
-        std::string defaultIP = executeCommand("getent hosts host.docker.internal | awk '{print $1}'");
+        std::string defaultIP = rf.check("ip_unity", Value("127.0.0.1")).asString(); //executeCommand("getent hosts host.docker.internal | awk '{print $1}'");
         if (inet_pton(AF_INET, defaultIP.c_str(), &(serverAddr.sin_addr)) <= 0)
         {
-            if (inet_pton(AF_INET, "127.0.0.1", &(serverAddr.sin_addr)) <= 0){
-                std::cerr << "Error: Invalid IP address." << std::endl;
-                return false;
-            }
+            return false;
         }
 
         // =====READ PARAMETERS=====
