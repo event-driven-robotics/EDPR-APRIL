@@ -230,6 +230,8 @@ public:
             yInfo() << "--f_det <float> : HPE detection rate [5]";
             yInfo() << "--pu <float>    : KF process uncertainty [10.0]";
             yInfo() << "--muD <float>   : KF measurement uncertainty [1.0]";
+            yInfo() << "--eros_decay <float>   : decay parameter for EROS [0.3]";
+            yInfo() << "--eros_kernel_size <int>   : EROS kernel size [5]";
             yInfo() << "--confidence <float> : threshold for skeleton confidence [0.4]";
             return false;
         }
@@ -271,6 +273,8 @@ public:
         pltTra = rf.check("pltTra") && rf.check("pltTra", Value(true)).asBool();
         pltRoi = rf.check("pr") && rf.check("pr", Value(true)).asBool();
         detF = rf.check("f_det", Value(10)).asInt32();
+        int eros_kernel_size = rf.check("eros_kernel_size", Value(5)).asInt32();
+        double eros_decay = rf.check("eros_decay", Value(0.3)).asFloat64();
         image_size = cv::Size(rf.check("w", Value(640)).asInt32(),
                               rf.check("h", Value(480)).asInt32());
         roiSize = rf.check("roi", Value(20)).asInt32();
@@ -300,7 +304,7 @@ public:
         // ===== SET UP INTERNAL VARIABLE/DATA STRUCTURES =====
 
         // shared images
-        eros_handler.init(image_size.width, image_size.height, 7, 0.3);
+        eros_handler.init(image_size.width, image_size.height, eros_kernel_size, eros_decay);
         binary_handler.init(image_size.width, image_size.height);
         sae_handler.init(image_size.width, image_size.height);
 
