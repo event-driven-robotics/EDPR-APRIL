@@ -145,7 +145,7 @@ ENV PYTHONPATH "${PYTHONPATH}:$SOURCE_FOLDER/hpe-core"
 
 # APRIL application
 RUN cd $SOURCE_FOLDER && \
-    git clone --branch main https://github.com/event-driven-robotics/EDPR-APRIL.git && \
+    git clone --branch fruit-ninja https://github.com/event-driven-robotics/EDPR-APRIL.git && \
     cd EDPR-APRIL && mkdir build && cd build && \
     cmake .. && make install -j$(nproc)
     
