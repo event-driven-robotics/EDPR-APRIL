@@ -1,0 +1,39 @@
+services:
+  yarpserver:
+    container_name: yarpserver
+    image: hpe
+    build: . 
+    network_mode: host
+    volumes:
+      - ./entrypoints:/entrypoints
+    entrypoint: ["/bin/bash", "/entrypoints/run_yarpserver.sh"]
+  atis-bridge:
+    container_name: atis-bridge
+    image: hpe
+    build: . 
+    network_mode: host
+    volumes:
+      - ./entrypoints:/entrypoints
+    depends_on:
+      - yarpserver
+    devices:
+      - "/dev/bus/usb/002/002:/dev/bus/usb/002/002"
+    entrypoint: ["/bin/bash", "/entrypoints/run_atis_bridge.sh"]
+  edpr-april:
+    container_name: edpr-april
+    image: hpe
+    build: . 
+    network_mode: host
+    volumes:
+      - ./entrypoints:/entrypoints
+      - ../../:/home/hpe/code
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    depends_on:
+      - yarpserver
+      - atis-bridge
+    # add gui support
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    # command: sleep infinity
+    entrypoint: ["/bin/bash", "/entrypoints/run_movenet.sh"]

@@ -222,6 +222,7 @@ public:
         double procU = rf.check("pu", Value(1e-1)).asFloat64();
         double measUD = rf.check("muD", Value(1e-4)).asFloat64();
         double measUV = rf.check("muV", Value(0)).asFloat64();
+        std::string checkpoint_path = rf.check("checkpoint_path", Value("/usr/local/src/hpe-core/example/movenet/models/h36m_finetuned.pth")).asString();
         latency_compensation = rf.check("use_lc") && rf.check("use_lc", Value(true)).asBool();
         double lc = latency_compensation ? 1.0 : 0.0;
         thF = rf.check("f_vis", Value(100.0)).asFloat64();
@@ -231,11 +232,14 @@ public:
         // pltDet = true;
         pltTra = true;
         
+        // concatenate the checkpoint path
+        std::string command = "python3 /home/hpe/code/hpe-core/example/movenet/movenet_online.py --gpu --checkpoint_path " + checkpoint_path + " &";
+        int r = system(command.c_str());
 
-        int r = system("python3 /usr/local/src/hpe-core/example/movenet/movenet_online.py --gpu --upper &");
         while (!yarp::os::NetworkBase::exists("/movenet/sklt:o"))
             sleep(1);
         yInfo() << "MoveEnet started correctly";
+
         if (!mn_handler.init(getName("/eros:o"), getName("/movenet:i"), detF))
         {
             yError() << "Could not open movenet ports";
