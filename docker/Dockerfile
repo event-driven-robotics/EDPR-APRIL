@@ -4,7 +4,7 @@ ARG SOURCE_FOLDER=/usr/local/src
 ARG BUILD_TYPE=Release
 ARG YCM_VERSION=v0.15.1
 ARG YARP_VERSION=v3.7.2
-ARG EVENT_DRIVEN_VERSION=master
+ARG EVENT_DRIVEN_VERSION=main
 ARG HPE_VERSION=main
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -14,16 +14,9 @@ RUN apt install -y build-essential libssl-dev software-properties-common \
     libboost-all-dev libmysqlclient-dev ffmpeg libsm6 libxext6 libcanberra-gtk-module \
     apt-transport-https ca-certificates gnupg lsb-core swig \
     libgsl-dev libedit-dev libace-dev libeigen3-dev 
-    #qtbase5-dev qt5-default qtdeclarative5-dev qtmultimedia5-dev qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtmultimedia qml-module-qtquick-dialogs qml-module-qtquick-controls
     
-RUN add-apt-repository ppa:deadsnakes/ppa
-RUN echo "deb [arch=amd64 trusted=yes] https://apt.prophesee.ai/dists/public/7l58osgr/ubuntu focal essentials" >> /etc/apt/sources.list;
-
 RUN apt update
-RUN apt install -y python3.7 python3-pip python3.7-dev
-# RUN pip3 install numpy
-RUN apt install -y libopencv-dev python3-opencv
-RUN apt update && apt install -y metavision-*
+RUN apt install -y python3.8 python3-pip python3.8-dev libopencv-dev python3-opencv
 
 RUN cd $SOURCE_FOLDER && \
     git clone --depth 1 --branch $YCM_VERSION https://github.com/robotology/ycm.git &&\
@@ -69,6 +62,3 @@ RUN apt autoremove && apt clean
 RUN rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
 
 WORKDIR $SOURCE_FOLDER
-# COPY run_yarpserver.sh .
-# COPY run_atis_bridge.sh .
-# COPY run_movenet.sh .

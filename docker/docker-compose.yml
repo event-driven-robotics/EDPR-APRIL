@@ -9,8 +9,7 @@ services:
     entrypoint: ["/bin/bash", "/entrypoints/run_yarpserver.sh"]
   atis-bridge:
     container_name: atis-bridge
-    image: hpe
-    build: . 
+    image: eventdrivenrobotics/atis-gen3:focal_yarp_v3.8.1_ed_vmain
     network_mode: host
     volumes:
       - ./entrypoints:/entrypoints
